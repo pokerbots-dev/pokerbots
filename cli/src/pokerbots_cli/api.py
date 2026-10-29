@@ -3,7 +3,7 @@ import os
 import urllib.error
 import urllib.request
 
-from . import auth
+from . import __version__, auth
 
 
 class ApiError(Exception):
@@ -15,7 +15,7 @@ def base():
 
 
 def call(method, path, body=None, data=None, headers=None):
-    headers = dict(headers or {})
+    headers = {"User-Agent": f"pb/{__version__}", **(headers or {})}
     if "CF-Access-Client-Id" not in headers:
         credentials = auth.load()
         if not credentials:
