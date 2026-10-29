@@ -69,4 +69,6 @@ class Server(HTTPServer):
 
 
 if __name__ == "__main__":
+    # Hide each bot's processes from the others (their names and command lines could carry messages).
+    subprocess.run(["mount", "-o", "remount,hidepid=2", "/proc"], check=False)
     Server(("0.0.0.0", 8080), Handler).serve_forever()
