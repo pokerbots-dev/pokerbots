@@ -31,7 +31,7 @@ No other colors. No gradients, shadows, rounded corners, icons, images or emoji.
 - State facts. No slogans, adjectives or persuasion.
 - Use the fewest words that are still clear; prefer a command or a number to a sentence.
 - Lowercase labels; sentence case elsewhere.
-- Money in plain dollars and cents (`10¢`, `37¢`), never poker jargon.
+- Money in plain dollars and cents (`10¢`, `39¢`), never poker jargon.
 - Everything a user does is a `pb` command; the site never asks for input.
 
 ## The same style in the terminal

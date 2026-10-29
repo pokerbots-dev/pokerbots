@@ -127,7 +127,7 @@ price
 
   live*   buy-in   10¢
           pot      60¢
-          1st      37¢
+          1st      39¢
           2nd      20¢
           paid in  USDC on Solana
 
