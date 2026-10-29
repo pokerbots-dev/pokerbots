@@ -1,7 +1,7 @@
 // Finished games for analysis. Games appear 10 minutes after they end; hole cards are shown
 // only for the requester's own seat and for hands that reached showdown, as at a real table.
 import type { User } from "./auth";
-import { BUY_IN, PRIZES, type Env } from "./env";
+import type { Env } from "./env";
 import { HttpError } from "./http";
 import { historyKey } from "./match";
 
@@ -59,6 +59,13 @@ export async function history(req: Request, env: Env, user: User) {
      FROM seats s LEFT JOIN users u ON u.id = s.user_id
      WHERE s.game_id IN (${games.map(() => "?").join()}) ORDER BY s.seat`,
   ).bind(...games.map((g) => g.id)).all<SeatRow>();
+  // What each live seat actually netted (buy-in, prize, refund), whatever the prizes were then.
+  const { results: nets } = await env.DB.prepare(
+    `SELECT s.game_id || ':' || s.seat AS ref, SUM(l.amount) AS net FROM seats s
+     JOIN ledger l ON l.ref = s.game_id || ':' || s.seat AND l.kind IN ('buyin', 'payout', 'refund')
+     WHERE s.game_id IN (${games.map(() => "?").join()}) GROUP BY s.game_id, s.seat`,
+  ).bind(...games.map((g) => g.id)).all<{ ref: string; net: number }>();
+  const net = new Map(nets.map((n) => [n.ref, n.net]));
 
   const out = await Promise.all(games.map(async (g) => {
     const table = seats.filter((s) => s.game_id === g.id);
@@ -75,7 +82,7 @@ export async function history(req: Request, env: Env, user: User) {
         ...(s.user_id === user.id ? { version: s.version, decisions: s.decisions, late: s.late, errors: s.errors } : {}),
         place: s.place,
         rating_change: s.rating_delta === null ? null : Math.round(s.rating_delta * 10) / 10,
-        won: g.mode === "live" ? ((PRIZES[s.place - 1] ?? 0) - BUY_IN) / 1e6 : null,
+        won: g.mode === "live" && s.user_id ? (net.get(`${g.id}:${s.seat}`) ?? 0) / 1e6 : null,
       })),
       hands: await hands(env, g.id, mine),
     };
