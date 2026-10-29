@@ -44,7 +44,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: deploy --env staging
+          command: |
+            d1 migrations apply pokerbots-staging --env staging --remote
+            deploy --env staging
       - name: Deploy production (mainnet)
         if: steps.check.outputs.present == 'true' && env.TARGET != 'staging'
         uses: cloudflare/wrangler-action@v3
@@ -52,4 +54,16 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: deploy --env production
+          command: |
+            d1 migrations apply pokerbots-production --env production --remote
+            deploy --env production
+      - name: Deploy site
+        if: env.TARGET != 'staging'
+        run: cp cli/src/pokerbots_cli/docs.md site/llms.txt
+      - if: env.TARGET != 'staging'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: deploy

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pokerbots.dev</title>
+<meta name="description" content="Rated poker for bots. 6-bot no-limit hold'em sit-and-go. Free on paper, 10¢ live.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F4F3EF;
+    --ink: #111111;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 72px 20px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+  }
+  section { display: flex; flex-direction: column; gap: 12px; }
+  .label { margin: 0; font-weight: 700; }
+  pre {
+    margin: 0;
+    font: inherit;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  pre.cmd { background: var(--ink); color: var(--paper); padding: 14px 16px; }
+  a { color: var(--ink); text-underline-offset: 3px; }
+  a:hover { background: var(--ink); color: var(--paper); }
+  .open { border-top: 1px solid var(--ink); padding-top: 32px; }
+  .badge {
+    margin: 0;
+    align-self: flex-start;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 6px 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  @media (max-width: 600px) {
+    body { font-size: 13px; }
+    main { padding-top: 48px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<section>
+<p class="label">install</p>
+<pre class="cmd">$ curl -fsSL https://pokerbots.dev/install | sh</pre>
+</section>
+
+<section>
+<p class="label">start</p>
+<pre>$ pb login
+$ pb docs
+$ pb init mybot &amp;&amp; cd mybot
+$ pb test
+$ pb upload
+$ pb deploy v1 --paper
+$ pb deploy v1 --live</pre>
+</section>
+
+<section>
+<p class="label">bot.py</p>
+<pre>class Bot:
+    def act(self, state):
+        if "check" in state["legal"]:
+            return ("check",)
+        return ("fold",)</pre>
+</section>
+
+<section>
+<p class="label">game</p>
+<pre>no-limit hold'em sit-and-go
+6 bots, new random table every game
+1,000 chips each
+blinds on hand n: n / 2n
+ends at last bot standing or 100 hands
+20 ms per decision, else check/fold
+up to 5 games a minute per bot</pre>
+</section>
+
+<section>
+<p class="label">price</p>
+<pre>paper   free, 1,000 games/day
+
+live*   buy-in   10¢
+        pot      60¢
+        1st      37¢
+        2nd      20¢
+        paid in  ◎ USDC on Solana
+
+* 18+, and only where paid skill competitions are allowed for you.
+  deposits are held in our Solana wallets and tracked by us until you
+  withdraw. your wallet key stays on your machine.</pre>
+</section>
+
+<section class="open">
+<p class="badge">OPEN TO EVERYONE.</p>
+</section>
+
+<section>
+<p class="label">docs</p>
+<pre>$ pb docs            # in your terminal
+$ pb docs --plain    # for agents
+<a href="/llms.txt">pokerbots.dev/llms.txt</a></pre>
+</section>
+
+<section>
+<p class="label">contact</p>
+<pre><a href="mailto:hello@pokerbots.dev">hello@pokerbots.dev</a></pre>
+</section>
+
+</main>
+</body>
+</html>
