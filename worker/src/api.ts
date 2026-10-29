@@ -36,6 +36,10 @@ export const userRoutes: Routes<Ctx> = {
         `SELECT d.mode, d.version, r.rating, r.games,
            (SELECT COUNT(*) FROM seats s JOIN games g ON g.id = s.game_id
             WHERE s.user_id = d.user_id AND g.mode = d.mode AND g.status != 'failed' AND g.created_at >= date('now')) AS today,
+           (SELECT COALESCE(SUM(s.rating_delta), 0) FROM seats s JOIN games g ON g.id = s.game_id
+            WHERE s.user_id = d.user_id AND g.mode = d.mode AND g.created_at >= date('now')) AS rating_today,
+           CASE WHEN d.mode = 'live' THEN (SELECT COALESCE(SUM(amount), 0) FROM ledger l WHERE l.user_id = d.user_id
+             AND l.created_at >= date('now') AND (l.kind IN ('buyin', 'payout') OR (l.kind = 'refund' AND l.ref NOT LIKE 'w:%'))) END AS won_today,
            q.version_games, q.decisions, q.late, q.errors
          FROM deployments d JOIN ratings r USING (user_id, mode)
          LEFT JOIN (SELECT g.mode, s.version, COUNT(*) AS version_games, SUM(s.decisions) AS decisions, SUM(s.late) AS late, SUM(s.errors) AS errors
@@ -73,7 +77,7 @@ export const userRoutes: Routes<Ctx> = {
   async "POST /versions"({ req, env, user }) {
     requireActive(user);
     const data = await req.arrayBuffer();
-    if (data.byteLength > MAX_BOT_BYTES) throw new HttpError(413, "bot is over 1 MB zipped");
+    if (data.byteLength > MAX_BOT_BYTES) throw new HttpError(413, "bot is over 5 MB zipped");
     if (data.byteLength < 4 || new DataView(data).getUint32(0, true) !== ZIP_MAGIC) throw new HttpError(400, "not a zip");
     const version = (await env.DB.prepare(
       "INSERT INTO versions (user_id, version, size) SELECT ?1, COALESCE(MAX(version), 0) + 1, ?2 FROM versions WHERE user_id = ?1 RETURNING version",
@@ -97,7 +101,7 @@ export const userRoutes: Routes<Ctx> = {
     await env.DB.batch([
       env.DB.prepare("INSERT INTO deployments VALUES (?, ?, ?) ON CONFLICT (user_id, mode) DO UPDATE SET version = excluded.version")
         .bind(user.id, m, input.version),
-      env.DB.prepare("INSERT OR IGNORE INTO ratings (user_id, mode) VALUES (?, ?)").bind(user.id, m),
+      env.DB.prepare("INSERT OR IGNORE INTO ratings (user_id, mode, best) VALUES (?, ?, 1500)").bind(user.id, m),
     ]);
     return { mode: m, version: input.version };
   },

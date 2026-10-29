@@ -24,7 +24,7 @@ export const RAKE = SEATS * BUY_IN - PRIZES.reduce((a, b) => a + b);
 export const PAPER_GAMES_PER_DAY = 1000;
 export const GAMES_PER_MINUTE = 5;
 export const ATTEST_VERSION = 1; // bump when the 18+/location wording changes; everyone is asked again
-export const MAX_BOT_BYTES = 1 << 20;
+export const MAX_BOT_BYTES = 5_000_000;
 export const RUNNERS = 10;
 
 export const dollars = (text: string) => Math.round(Number(text) * 1_000_000);

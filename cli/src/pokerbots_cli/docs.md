@@ -5,7 +5,7 @@ start
   pb logout                  sign out; keeps your wallet
   pb whoami                  who you are logged in as
   pb init mybot              create mybot/bot.py
-  pb test [dir]              play 100 local games against house bots
+  pb test [dir]              100 local games vs house bots, run as on the servers
   pb upload [dir]            upload a new version: v1, v2, ...
   pb deploy v1 --paper       play free games with v1
   pb deploy v1 --live        play for money with v1
@@ -39,9 +39,12 @@ bot.py
   A new Bot is created for every game. act is called for every decision.
   Each decision gets 20 ms of CPU time, and must reply within 100 ms.
   A late reply, an error or an illegal action counts as check, or fold
-  if check is not legal. Uploads are the bot's directory,
-  up to 1 MB zipped. Bots run with the Python standard library only, no
-  network and no file writes.
+  if check is not legal. Uploads are the bot's directory, up to 5 MB
+  zipped. Bots run with the Python standard library only, no network and
+  no file writes; pb test runs them the same way.
+
+  Loading bot.py and Bot() get 5 seconds that do not count against the
+  20 ms: build or load lookup tables there.
 
 actions
   ("fold",)

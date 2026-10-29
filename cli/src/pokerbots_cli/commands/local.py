@@ -1,9 +1,9 @@
-import importlib.util
 import pydoc
 import random
 import shutil
 import subprocess
 import sys
+import tempfile
 from importlib import resources
 from pathlib import Path
 
@@ -11,6 +11,10 @@ from .. import engine
 from ..agent import Agent
 from ..fmt import table
 from ..house import BOTS
+from ..sandbox import ProcessBot, read_only_copy
+from .account import MAX_UPLOAD, bundle
+
+SAFE_MS = 10
 
 PACKAGE = resources.files("pokerbots_cli")
 
@@ -32,27 +36,34 @@ def init(args):
     print(f"created {path / 'bot.py'}")
 
 
-def load_bot(directory):
-    path = Path(directory) / "bot.py"
-    if not path.exists():
-        sys.exit(f"no bot.py in {directory}")
-    sys.path.insert(0, str(path.parent.resolve()))
-    spec = importlib.util.spec_from_file_location("bot", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.Bot
+def play(args, directory, mine, places):
+    rng = random.Random(args.seed)
+    for _ in range(args.games):
+        mine.bot = ProcessBot(directory, stderr=subprocess.PIPE)
+        if not mine.bot.alive:
+            sys.exit(f"bot.py did not start (servers allow the Python standard library only):\n\n{mine.bot.startup_error}")
+        agents = [mine] + [Agent(cls()) for cls in BOTS]
+        rng.shuffle(agents)
+        try:
+            places.append(engine.play(agents, rng).places.index(agents.index(mine)) + 1)
+        finally:
+            mine.bot.close()
 
 
 def test(args):
-    Bot = load_bot(args.dir)
-    rng = random.Random(args.seed)
-    mine = Agent(None)
-    places = []
-    for _ in range(args.games):
-        mine.bot = Bot()
-        agents = [mine] + [Agent(cls()) for cls in BOTS]
-        rng.shuffle(agents)
-        places.append(engine.play(agents, rng).places.index(agents.index(mine)) + 1)
+    """Plays local games with the bot run as on the servers: own process, standard library only, no file writes."""
+    directory = Path(args.dir)
+    size = len(bundle(directory))
+    mine, places = Agent(None), []
+    with tempfile.TemporaryDirectory() as root:
+        copy = Path(root) / "bot"
+        read_only_copy(directory, copy)
+        try:
+            play(args, copy, mine, places)
+        finally:
+            for path in [copy, *copy.rglob("*")]:
+                path.chmod(0o755 if path.is_dir() else 0o644)
+    slowest = mine.slowest * 1000
     print(table([
         ["games", args.games],
         ["1st", places.count(1)],
@@ -61,8 +72,9 @@ def test(args):
         ["decisions", mine.decisions],
         ["late", mine.late],
         ["errors", mine.errors],
-        ["slowest", f"{mine.slowest * 1000:.2f} ms cpu"],
-    ]))
+        ["slowest", f"{slowest:.2f} ms" + ("  servers are slower: aim under 10 ms" if slowest > SAFE_MS else "")],
+        ["size", f"{size / 1e6:.2f} MB of {MAX_UPLOAD / 1e6:.0f} MB"],
+    ], labels=True))
     if mine.error:
         print(f"\nfirst error\n{mine.error}")
         return 1
