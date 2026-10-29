@@ -1,5 +1,6 @@
 import io
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from ..api import call
 from ..fmt import money, place, table
 
 MAX_UPLOAD = 1 << 20
+WATCH_SECONDS = 5
 ATTEST = "I am 18 or older, and paid skill competitions are allowed where I am. [y/N] "
 
 
@@ -54,20 +56,34 @@ def stop(args):
     print(f"stopped {mode}")
 
 
-def status(args):
+def report():
     me = call("GET", "/me")
     rows = [["user", me["login"]], ["versions", " ".join(f"v{v}" for v in me["versions"]) or "-"]]
     for mode in ("paper", "live"):
         d = me["deployments"].get(mode)
         rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}" if d else "-"])
     rows += [["balance", money(me["balance"])], ["wallet", me["wallet"] or "-"]]
-    print(table(rows))
+    text = table(rows)
     games = call("GET", "/games")
     if games:
-        print()
-        print(table([["game", "mode", "place", "hands"]] + [
+        text += "\n\n" + table([["game", "mode", "place", "hands"]] + [
             [g["created_at"], g["mode"], place(g["place"]), g["hands"] or "-"] for g in games
-        ]))
+        ])
+    return text
+
+
+def status(args):
+    print(report())
+
+
+def watch(args):
+    try:
+        while True:
+            sys.stdout.write("\x1b[H\x1b[2J" + report() + "\n\nctrl-c to quit\n")
+            sys.stdout.flush()
+            time.sleep(WATCH_SECONDS)
+    except KeyboardInterrupt:
+        pass
 
 
 def register(sub):
@@ -87,3 +103,4 @@ def register(sub):
         p.set_defaults(run=run)
 
     sub.add_parser("status", help="your bot, rating, balance and recent games").set_defaults(run=status)
+    sub.add_parser("watch", help="status, live").set_defaults(run=watch)
