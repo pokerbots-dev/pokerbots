@@ -10,8 +10,13 @@ const BOOT_WAIT_MS = 500;
 export class Runner extends DurableObject<Env> {
   async fetch(req: Request): Promise<Response> {
     const container = this.ctx.container!;
+    const image = container.images.runner;
+    if (container.running && (await this.ctx.storage.get("image")) !== image) {
+      await container.destroy(); // a deploy shipped a new image; don't keep serving the old one
+    }
     if (!container.running) {
-      container.start({ image: container.images.runner, instance: "standard-1", enableInternet: false });
+      await this.ctx.storage.put("image", image);
+      container.start({ image, instance: "standard-1", enableInternet: false });
       container.monitor().catch((e) => console.error("container stopped", String(e)));
     }
     await container.setInactivityTimeout(IDLE_MS);

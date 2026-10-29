@@ -71,7 +71,7 @@ async function settleDeposit(env: Env, c: Chain, d: Deposit) {
 
 // Solana's simulation errors, in words a player can act on.
 function reason(e: { message?: string; cause?: { message?: string }; context?: unknown }) {
-  const text = `${e.message} ${e.cause?.message} ${JSON.stringify(e.context ?? "")}`.toLowerCase();
+  const text = `${e.message} ${e.cause?.message} ${JSON.stringify(e.context ?? "", (_, v) => (typeof v === "bigint" ? String(v) : v))}`.toLowerCase();
   if (/insufficient funds|0x1\b|"custom":1\b/.test(text)) return "not enough USDC in your wallet";
   if (/accountnotfound|could not find account|invalid account data|0xbc4|uninitialized/.test(text)) return "your wallet has no USDC yet: send USDC on Solana to it first";
   if (/blockhash/.test(text)) return "the transaction expired; try again";
