@@ -1,18 +1,58 @@
-export interface Env {
-  SOLANA_CLUSTER: "devnet" | "mainnet-beta";
-  SOLANA_RPC_URL?: string; // secret; contains the Helius API key, never log or return it
+import { adminRoutes } from "./admin";
+import { userRoutes } from "./api";
+import { authenticate, authenticateAdmin } from "./auth";
+import type { Env } from "./env";
+import { HttpError, route } from "./http";
+import { failGame, matchmake, runGame } from "./match";
+import { reconcile } from "./payments";
+
+export { Runner } from "./runner";
+
+const MAX_ATTEMPTS = 3;
+
+async function handle(req: Request, env: Env): Promise<unknown> {
+  const { pathname } = new URL(req.url);
+  if (pathname === "/health") return { ok: true, cluster: env.SOLANA_CLUSTER };
+  if (pathname.startsWith("/admin/")) {
+    const match = route(adminRoutes, req.method, pathname);
+    if (!match) throw new HttpError(404, "not found");
+    await authenticateAdmin(req, env);
+    return match[0]({ req, env }, match[1]);
+  }
+  const match = route(userRoutes, req.method, pathname);
+  if (!match) throw new HttpError(404, "not found");
+  return match[0]({ req, env, user: await authenticate(req, env) }, match[1]);
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname === "/health") {
-      return Response.json({
-        ok: true,
-        cluster: env.SOLANA_CLUSTER,
-        rpc_configured: Boolean(env.SOLANA_RPC_URL),
-      });
+  async fetch(req, env) {
+    try {
+      return Response.json(await handle(req, env));
+    } catch (e) {
+      if (e instanceof HttpError) return Response.json({ error: e.message }, { status: e.status });
+      console.error(e);
+      return Response.json({ error: "internal error" }, { status: 500 });
     }
-    return new Response("Not found", { status: 404 });
   },
-} satisfies ExportedHandler<Env>;
+
+  async scheduled(_, env, ctx) {
+    const jobs = await Promise.allSettled([matchmake(env), reconcile(env)]);
+    jobs.forEach((j) => j.status === "rejected" && console.error(j.reason));
+  },
+
+  async queue(batch, env) {
+    await Promise.all(
+      batch.messages.map(async (message) => {
+        try {
+          await runGame(env, message.body);
+          message.ack();
+        } catch (e) {
+          console.error("game", message.body, e);
+          if (message.attempts < MAX_ATTEMPTS) return message.retry({ delaySeconds: 10 });
+          await failGame(env, message.body);
+          message.ack();
+        }
+      }),
+    );
+  },
+} satisfies ExportedHandler<Env, string>;

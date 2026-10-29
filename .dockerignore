@@ -1,0 +1,7 @@
+*
+!cli/pyproject.toml
+!cli/README.md
+!cli/src
+!runner
+**/__pycache__
+**/.pytest_cache

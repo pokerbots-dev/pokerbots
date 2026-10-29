@@ -1,7 +1,5 @@
-// Always deploy with --env: staging runs on Solana devnet, production on mainnet.
-// Secrets (set per environment, never committed):
-//   wrangler secret put SOLANA_RPC_URL --env staging      # Helius devnet URL
-//   wrangler secret put SOLANA_RPC_URL --env production   # Helius mainnet URL
+// Always deploy with --env staging or --env production; the bare worker is unused.
+// Secrets per env: SOLANA_RPC_URL, HOT_WALLET_KEY (wrangler secret put NAME --env ...).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pokerbots",
@@ -13,12 +11,48 @@
     "staging": {
       "workers_dev": false,
       "preview_urls": false,
-      "vars": { "SOLANA_CLUSTER": "devnet" }
+      "routes": [{ "pattern": "staging-api.pokerbots.dev", "custom_domain": true }],
+      "vars": {
+        "SOLANA_CLUSTER": "devnet",
+        "USDC_MINT": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        "WITHDRAW_USER_DAILY_CAP": "100",
+        "WITHDRAW_TOTAL_DAILY_CAP": "2000",
+        "ACCESS_TEAM": "shrill-heart-4f39",
+        "ACCESS_AUD": "fab9abc433aa025094475148bfd66624b71cea6f9fb8fcd0662c24371875c902"
+      },
+      "d1_databases": [{ "binding": "DB", "database_name": "pokerbots-staging", "database_id": "ff1df614-93dd-446f-88de-cfb88ba3f901", "migrations_dir": "migrations" }],
+      "r2_buckets": [{ "binding": "BOTS", "bucket_name": "pokerbots-bots-staging" }],
+      "queues": {
+        "producers": [{ "binding": "GAMES", "queue": "pokerbots-games-staging" }],
+        "consumers": [{ "queue": "pokerbots-games-staging", "max_batch_size": 10, "max_retries": 3 }]
+      },
+      "triggers": { "crons": ["* * * * *"] },
+      "durable_objects": { "bindings": [{ "name": "RUNNER", "class_name": "Runner" }] },
+      "containers": [{ "class_name": "Runner", "image": "../runner/Dockerfile", "image_build_context": "..", "max_instances": 10 }],
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Runner"] }]
     },
     "production": {
       "workers_dev": false,
       "preview_urls": false,
-      "vars": { "SOLANA_CLUSTER": "mainnet-beta" }
+      "routes": [{ "pattern": "api.pokerbots.dev", "custom_domain": true }],
+      "vars": {
+        "SOLANA_CLUSTER": "mainnet-beta",
+        "USDC_MINT": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "WITHDRAW_USER_DAILY_CAP": "100",
+        "WITHDRAW_TOTAL_DAILY_CAP": "2000",
+        "ACCESS_TEAM": "shrill-heart-4f39",
+        "ACCESS_AUD": "fab9abc433aa025094475148bfd66624b71cea6f9fb8fcd0662c24371875c902"
+      },
+      "d1_databases": [{ "binding": "DB", "database_name": "pokerbots-production", "database_id": "e1de54dc-9562-43f6-8e65-1316bfc40727", "migrations_dir": "migrations" }],
+      "r2_buckets": [{ "binding": "BOTS", "bucket_name": "pokerbots-bots-production" }],
+      "queues": {
+        "producers": [{ "binding": "GAMES", "queue": "pokerbots-games-production" }],
+        "consumers": [{ "queue": "pokerbots-games-production", "max_batch_size": 10, "max_retries": 3 }]
+      },
+      "triggers": { "crons": ["* * * * *"] },
+      "durable_objects": { "bindings": [{ "name": "RUNNER", "class_name": "Runner" }] },
+      "containers": [{ "class_name": "Runner", "image": "../runner/Dockerfile", "image_build_context": "..", "max_instances": 10 }],
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Runner"] }]
     }
   }
 }

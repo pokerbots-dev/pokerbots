@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+if command -v uv >/dev/null 2>&1; then
+  uv tool install --upgrade pokerbots-dev
+elif command -v pipx >/dev/null 2>&1; then
+  pipx install --force pokerbots-dev
+else
+  echo "pb needs uv or pipx: https://docs.astral.sh/uv/" >&2
+  exit 1
+fi
+
+echo "installed. next: pb login"
