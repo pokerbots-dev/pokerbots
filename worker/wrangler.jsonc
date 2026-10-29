@@ -11,6 +11,7 @@
     "staging": {
       "workers_dev": false,
       "preview_urls": false,
+      "observability": { "enabled": true },
       "routes": [{ "pattern": "staging-api.pokerbots.dev", "custom_domain": true }],
       "vars": {
         "SOLANA_CLUSTER": "devnet",
@@ -28,12 +29,13 @@
       },
       "triggers": { "crons": ["* * * * *"] },
       "durable_objects": { "bindings": [{ "name": "RUNNER", "class_name": "Runner" }] },
-      "containers": [{ "class_name": "Runner", "scheduling_policy": "durable_object", "images": { "runner": { "dockerfile": "../runner/Dockerfile", "build_context": ".." } } }],
+      "containers": [{ "class_name": "Runner", "scheduling_policy": "durable_object", "observability": { "logs": { "enabled": true } }, "images": { "runner": { "dockerfile": "../runner/Dockerfile", "build_context": ".." } } }],
       "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Runner"] }]
     },
     "production": {
       "workers_dev": false,
       "preview_urls": false,
+      "observability": { "enabled": true },
       "routes": [{ "pattern": "api.pokerbots.dev", "custom_domain": true }],
       "vars": {
         "SOLANA_CLUSTER": "mainnet-beta",
@@ -51,7 +53,7 @@
       },
       "triggers": { "crons": ["* * * * *"] },
       "durable_objects": { "bindings": [{ "name": "RUNNER", "class_name": "Runner" }] },
-      "containers": [{ "class_name": "Runner", "scheduling_policy": "durable_object", "images": { "runner": { "dockerfile": "../runner/Dockerfile", "build_context": ".." } } }],
+      "containers": [{ "class_name": "Runner", "scheduling_policy": "durable_object", "observability": { "logs": { "enabled": true } }, "images": { "runner": { "dockerfile": "../runner/Dockerfile", "build_context": ".." } } }],
       "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Runner"] }]
     }
   }

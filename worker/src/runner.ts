@@ -12,6 +12,7 @@ export class Runner extends DurableObject<Env> {
     const container = this.ctx.container!;
     if (!container.running) {
       container.start({ image: container.images.runner, instance: "standard-1", enableInternet: false });
+      container.monitor().catch((e) => console.error("container stopped", String(e)));
     }
     await container.setInactivityTimeout(IDLE_MS);
     const body = await req.arrayBuffer();
