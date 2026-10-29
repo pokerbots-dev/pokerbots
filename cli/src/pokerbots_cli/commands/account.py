@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .. import auth
 from ..api import call
-from ..fmt import money, place, table
+from ..fmt import INK, PAPER, colored, money, place, signed, table, when
 
 MAX_UPLOAD = 1 << 20
 WATCH_SECONDS = 5
@@ -63,12 +63,16 @@ def report():
         d = me["deployments"].get(mode)
         rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}" if d else "-"])
     rows += [["balance", money(me["balance"])], ["wallet", me["wallet"] or "-"]]
-    text = table(rows)
+    text = table(rows, labels=True)
     games = call("GET", "/games")
     if games:
-        text += "\n\n" + table([["game", "mode", "place", "hands"]] + [
-            [g["created_at"], g["mode"], place(g["place"]), g["hands"] or "-"] for g in games
-        ])
+        live = any(g["mode"] == "live" for g in games)
+        head = ["game", "mode", "place", "hands", "rating"] + (["won"] if live else [])
+        text += "\n\n" + table([head] + [
+            [when(g["created_at"]), g["mode"], place(g["place"]), g["hands"] or "-", signed(g.get("rating_delta"))]
+            + ([signed(g.get("net"), "money")] if live else [])
+            for g in games
+        ], header=True)
     return text
 
 
@@ -77,13 +81,18 @@ def status(args):
 
 
 def watch(args):
+    paint = f"\x1b[48;2;{INK}m\x1b[38;2;{PAPER}m" if colored() else ""
+    sys.stdout.write("\x1b[?1049h\x1b[?25l" + paint + "\x1b[2J")
     try:
         while True:
-            sys.stdout.write("\x1b[H\x1b[2J" + report() + "\n\nctrl-c to quit\n")
+            lines = ["", *("  " + line for line in report().split("\n")), "", "  " + "ctrl-c to quit"]
+            sys.stdout.write("\x1b[H" + "".join(line + "\x1b[K\n" for line in lines) + "\x1b[J")
             sys.stdout.flush()
             time.sleep(WATCH_SECONDS)
     except KeyboardInterrupt:
         pass
+    finally:
+        sys.stdout.write("\x1b[0m\x1b[?25h\x1b[?1049l")
 
 
 def register(sub):

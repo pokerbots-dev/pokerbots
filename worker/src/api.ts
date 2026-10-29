@@ -91,7 +91,10 @@ export const userRoutes: Routes<Ctx> = {
 
   async "GET /games"({ env, user }) {
     const { results } = await env.DB.prepare(
-      `SELECT g.id, g.mode, g.status, g.hands, g.created_at, s.place FROM seats s JOIN games g ON g.id = s.game_id
+      `SELECT g.id, g.mode, g.status, g.hands, g.created_at, s.place, s.rating_delta,
+         CASE WHEN g.mode = 'live' THEN (SELECT COALESCE(SUM(amount), 0) FROM ledger
+           WHERE user_id = s.user_id AND ref = g.id || ':' || s.seat AND kind IN ('buyin', 'payout', 'refund')) END AS net
+       FROM seats s JOIN games g ON g.id = s.game_id
        WHERE s.user_id = ? ORDER BY g.created_at DESC LIMIT ?`,
     ).bind(user.id, RECENT_GAMES).all();
     return results;

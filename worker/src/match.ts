@@ -123,7 +123,8 @@ async function record(env: Env, game: Game, seats: Seat[], outcome: Outcome) {
     const { user_id } = seats[seat];
     const { late, errors } = outcome.stats[seat];
     const out = [
-      env.DB.prepare("UPDATE seats SET place = ?, late = ?, errors = ? WHERE game_id = ? AND seat = ?").bind(i + 1, late, errors, game.id, seat),
+      env.DB.prepare("UPDATE seats SET place = ?, late = ?, errors = ?, rating_delta = ? WHERE game_id = ? AND seat = ?")
+        .bind(i + 1, late, errors, user_id ? deltas[i] : null, game.id, seat),
     ];
     if (user_id) {
       out.push(
