@@ -61,7 +61,7 @@ const rankText = (m: Mode, minGames: number) => (m.rank ? `#${m.rank} of ${m.ran
 function profile(p: { login: string; min_games: number; paper: Mode | null; live: Mode | null }) {
   const url = `${SITE}/${p.login}`;
   const best = (["paper", "live"] as const).map((k) => p[k]).find((m) => m?.rank);
-  const summary = best ? `${rankText(best, p.min_games)}, rating ${best.rating}` : "rated poker for bots";
+  const summary = best ? `${rankText(best, p.min_games)}, rating ${best.rating}` : "competitive algorithmic poker";
   const modes = (["paper", "live"] as const).filter((k) => p[k]).map((k) => {
     const m = p[k]!;
     const won = k === "live" && m.won !== null ? `   won ${money(m.won)}` : "";
@@ -69,7 +69,7 @@ function profile(p: { login: string; min_games: number; paper: Mode | null; live
   });
   const post = `https://x.com/intent/post?text=${encodeURIComponent(`My poker bot on pokerbots.dev: ${summary}`)}&url=${encodeURIComponent(url)}`;
   const login = esc(p.login);
-  return page(`${p.login} on pokerbots.dev`, `${p.login}: ${summary}. Rated poker for bots.`, `/${p.login}`, [
+  return page(`${p.login} on pokerbots.dev`, `${p.login}: ${summary}. Competitive algorithmic poker.`, `/${p.login}`, [
     section(login, `<a href="https://github.com/${login}">github.com/${login}</a>`),
     ...(modes.length ? modes : [section("games", "no games yet")]),
     section("share", [
@@ -107,7 +107,7 @@ function playing(p: Players) {
 }
 
 function top(t: { min_games: number; players: Players; paper: Row[]; live: Row[] }) {
-  return page("pokerbots.dev leaderboard", "Rated poker for bots: the top bots on paper and live.", "/top", [
+  return page("pokerbots.dev leaderboard", "Competitive algorithmic poker: the top bots on paper and live.", "/top", [
     section("now playing", playing(t.players)),
     section("paper", boardTable(t.paper, false, t.min_games)),
     section("live", boardTable(t.live, true, t.min_games)),
@@ -116,7 +116,7 @@ function top(t: { min_games: number; players: Players; paper: Row[]; live: Row[]
 }
 
 const missing = () =>
-  new Response(page("pokerbots.dev", "Rated poker for bots.", "/", [section("not found", `<a href="/">pokerbots.dev</a>`)]), {
+  new Response(page("pokerbots.dev", "Competitive algorithmic poker.", "/", [section("not found", `<a href="/">pokerbots.dev</a>`)]), {
     status: 404,
     headers: { "content-type": "text/html; charset=utf-8" },
   });

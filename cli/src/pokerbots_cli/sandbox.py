@@ -50,7 +50,49 @@ def confine(uid):
             os.setgroups([])
             os.setgid(uid)
             os.setuid(uid)
+            seccomp()
     return apply
+
+
+# x86_64 syscalls a bot could use to reach another bot at its table: sockets, named files,
+# System V / POSIX IPC, file locks, io_uring, and renaming itself (seen in /proc).
+DENY = {41, 133, 259, 83, 258, 88, 266, 86, 265, 82, 264, 316, 85, 29, 30, 64, 65, 66, 68, 69, 70, 71, 73, 240, 157, 425, 426, 427}
+OPEN = {2: 1, 257: 2}  # open, openat: index of the flags argument; only reads are allowed
+FCNTL, LOCKS = 72, {5, 6, 7, 36, 37, 38}
+WRITE, EPERM, AUDIT_X86_64 = 0o103, 1, 0xC000003E
+
+
+def seccomp():
+    """Fail the call (EPERM) for every syscall in DENY, opening files for writing and file locks; kill on other architectures."""
+    import ctypes
+    import struct
+
+    allow, deny, kill = 0x7FFF0000, 0x00050000 | EPERM, 0
+    ld = lambda k: (0x20, 0, 0, k)  # BPF_LD|BPF_W|BPF_ABS
+    jeq = lambda k, t, f: (0x15, t, f, k)
+    jset = lambda k, t, f: (0x45, t, f, k)
+    ret = lambda k: (0x06, 0, 0, k)
+    prog = [ld(4), jeq(AUDIT_X86_64, 1, 0), ret(kill), ld(0)]
+    for nr in sorted(DENY):
+        prog += [jeq(nr, 0, 1), ret(deny)]
+    for nr, arg in OPEN.items():
+        prog += [jeq(nr, 0, 3), ld(16 + 8 * arg), jset(WRITE, 0, 1), ret(deny), ld(0)]
+    prog += [jeq(FCNTL, 0, 2 + 2 * len(LOCKS)), ld(24)]
+    for i, cmd in enumerate(sorted(LOCKS)):
+        prog += [jeq(cmd, 0, 1), ret(deny)]
+    prog += [ld(0), ret(allow)]
+    code = b"".join(struct.pack("HBBI", *ins) for ins in prog)
+    buf = ctypes.create_string_buffer(code)
+
+    class Fprog(ctypes.Structure):
+        _fields_ = [("len", ctypes.c_ushort), ("filter", ctypes.c_void_p)]
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    PR_SET_NO_NEW_PRIVS, PR_SET_SECCOMP, SECCOMP_MODE_FILTER = 38, 22, 2
+    if libc.prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) or libc.prctl(
+        PR_SET_SECCOMP, SECCOMP_MODE_FILTER, ctypes.byref(Fprog(len(prog), ctypes.addressof(buf))), 0, 0
+    ):
+        raise OSError(ctypes.get_errno(), "seccomp")
 
 
 class ProcessBot:

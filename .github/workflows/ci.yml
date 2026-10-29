@@ -32,6 +32,13 @@ jobs:
       - run: pytest -q ../runner
       - run: pip install build && python -m build
 
+  runner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f runner/Dockerfile -t runner .
+      - run: docker run --rm runner sh -c "pip install -q pytest && pytest -q"
+
   worker:
     runs-on: ubuntu-latest
     steps:
