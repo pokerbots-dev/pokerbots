@@ -1,0 +1,24 @@
+// Always deploy with --env: staging runs on Solana devnet, production on mainnet.
+// Secrets (set per environment, never committed):
+//   wrangler secret put SOLANA_RPC_URL --env staging      # Helius devnet URL
+//   wrangler secret put SOLANA_RPC_URL --env production   # Helius mainnet URL
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pokerbots",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "env": {
+    "staging": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": { "SOLANA_CLUSTER": "devnet" }
+    },
+    "production": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": { "SOLANA_CLUSTER": "mainnet-beta" }
+    }
+  }
+}
