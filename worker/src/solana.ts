@@ -76,7 +76,7 @@ export async function send(c: Chain, wire: string) {
 }
 
 export async function status(c: Chain, signature: string, lastValid: number): Promise<Status> {
-  const { value: [s] } = await c.rpc.getSignatureStatuses([signature as Signature]).send();
+  const { value: [s] } = await c.rpc.getSignatureStatuses([signature as Signature], { searchTransactionHistory: true }).send();
   if (s?.err) return "failed";
   if (s && s.confirmationStatus !== "processed") return "confirmed";
   if (!s && Number(await c.rpc.getBlockHeight({ commitment: "confirmed" }).send()) > lastValid) return "failed";
