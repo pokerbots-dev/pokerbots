@@ -1,3 +1,4 @@
+import { send } from "./alerts";
 import type { Env } from "./env";
 import { HttpError, body, type Routes } from "./http";
 import { refundWithdrawal, sendWithdrawal } from "./payments";
@@ -19,6 +20,11 @@ export const adminRoutes: Routes<Ctx> = {
       chain(env).then(hotBalances),
     ]);
     return { users, games_today: games, liabilities, withdrawn_today: withdrawn, hot_usdc: hot.usdc, hot_sol: hot.sol };
+  },
+
+  async "POST /admin/test-alert"({ env }) {
+    await send(env, `test (${env.SOLANA_CLUSTER})`, "Alerts from pokerbots reach this inbox.");
+    return { sent: Boolean(env.EMAIL && env.ALERT_EMAIL) };
   },
 
   async "GET /admin/withdrawals"({ env }) {

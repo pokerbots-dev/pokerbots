@@ -25,11 +25,16 @@ def decide(args):
     print(f"{args.id} {reply['status']}")
 
 
+def test_alert(args):
+    print("sent" if admin("POST", "/test-alert")["sent"] else "not sent: ALERT_EMAIL is not set")
+
+
 def register(sub):
     p = sub.add_parser("admin")
     admin_sub = p.add_subparsers(metavar="command", required=True)
     admin_sub.add_parser("stats").set_defaults(run=stats)
     admin_sub.add_parser("withdrawals", help="pending withdrawals").set_defaults(run=withdrawals)
+    admin_sub.add_parser("test-alert", help="email a test alert").set_defaults(run=test_alert)
     for action in ("approve", "reject"):
         q = admin_sub.add_parser(action)
         q.add_argument("id")
