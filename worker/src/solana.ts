@@ -20,7 +20,6 @@ import {
 import {
   TOKEN_PROGRAM_ADDRESS,
   findAssociatedTokenPda,
-  getCreateAssociatedTokenIdempotentInstruction,
   getTransferCheckedInstruction,
 } from "@solana-program/token";
 import type { Env } from "./env";
@@ -42,7 +41,7 @@ export async function chain(env: Env) {
 const tokenAccount = async (c: Chain, owner: Address) =>
   (await findAssociatedTokenPda({ owner, mint: c.mint, tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0];
 
-// USDC transfer with the hot wallet paying fees; signed by every key we hold.
+// USDC transfer between existing USDC accounts, the hot wallet paying fees; signed by every key we hold.
 export async function transfer(c: Chain, from: Address, to: Address, amount: number) {
   const [source, destination] = await Promise.all([tokenAccount(c, from), tokenAccount(c, to)]);
   const authority = from === c.hot.address ? c.hot : createNoopSigner(from);
@@ -53,10 +52,8 @@ export async function transfer(c: Chain, from: Address, to: Address, amount: num
     (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m),
     (m) =>
       appendTransactionMessageInstructions(
-        [
-          getCreateAssociatedTokenIdempotentInstruction({ payer: c.hot, ata: destination, owner: to, mint: c.mint }),
-          getTransferCheckedInstruction({ source, mint: c.mint, destination, authority, amount: BigInt(amount), decimals: DECIMALS }),
-        ],
+        // Never create the destination's USDC account: its owner could close it and keep the SOL we paid for it.
+        [getTransferCheckedInstruction({ source, mint: c.mint, destination, authority, amount: BigInt(amount), decimals: DECIMALS })],
         m,
       ),
   );

@@ -36,9 +36,14 @@ export async function authenticate(req: Request, env: Env): Promise<User> {
   });
   if (!res.ok) throw new HttpError(401, "login expired: pb login");
   const github = await res.json<{ id: number; login: string }>();
-  const user = (await env.DB.prepare(
-    "INSERT INTO users (github_id, login) VALUES (?, ?) ON CONFLICT (github_id) DO UPDATE SET login = excluded.login RETURNING *",
-  ).bind(github.id, github.login).first<User>())!;
+  // A GitHub login freed by a rename can be taken by someone else; the old holder's row stops answering to it.
+  const [, upsert] = await env.DB.batch([
+    env.DB.prepare("UPDATE users SET login = login || '~' || id WHERE login = ? COLLATE NOCASE AND github_id != ?").bind(github.login, github.id),
+    env.DB.prepare(
+      "INSERT INTO users (github_id, login) VALUES (?, ?) ON CONFLICT (github_id) DO UPDATE SET login = excluded.login RETURNING *",
+    ).bind(github.id, github.login),
+  ]);
+  const user = upsert.results[0] as User;
   await env.DB.prepare("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?)").bind(hash, user.id, now + SESSION_SECONDS).run();
   return user;
 }
