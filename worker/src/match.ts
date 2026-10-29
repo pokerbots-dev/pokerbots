@@ -41,7 +41,7 @@ export async function matchmake(env: Env) {
   for (const mode of ["paper", "live"] as const) {
     const { results: bots } = await env.DB.prepare(
       `SELECT d.user_id, d.version,
-         COUNT(g.id) FILTER (WHERE g.created_at >= date('now')) AS today,
+         COUNT(g.id) FILTER (WHERE g.status != 'failed' AND g.created_at >= date('now')) AS today,
          COUNT(g.id) FILTER (WHERE g.status = 'queued') AS queued,
          ${balanceOf("d.user_id")} AS balance
        FROM deployments d

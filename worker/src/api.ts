@@ -27,7 +27,7 @@ export const userRoutes: Routes<Ctx> = {
       env.DB.prepare(
         `SELECT d.mode, d.version, r.rating, r.games,
            (SELECT COUNT(*) FROM seats s JOIN games g ON g.id = s.game_id
-            WHERE s.user_id = d.user_id AND g.mode = d.mode AND g.created_at >= date('now')) AS today
+            WHERE s.user_id = d.user_id AND g.mode = d.mode AND g.status != 'failed' AND g.created_at >= date('now')) AS today
          FROM deployments d JOIN ratings r USING (user_id, mode) WHERE d.user_id = ?`,
       ).bind(user.id).all<{ mode: string }>(),
       balance(env, user.id),

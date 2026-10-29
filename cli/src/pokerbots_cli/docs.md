@@ -9,6 +9,7 @@ start
   pb deploy v1 --live        play for money with v1
   pb stop --paper|--live     stop playing
   pb status                  versions, rating, balance, recent games
+  pb watch                   the same, refreshed every 5 seconds
   pb docs [--plain]          show this
 
 money
