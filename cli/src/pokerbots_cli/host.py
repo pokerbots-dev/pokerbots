@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import traceback
 
@@ -8,6 +9,8 @@ out, sys.stdout = sys.stdout, sys.stderr
 from bot import Bot  # noqa: E402
 
 bot = Bot()
+# Startup errors went to stderr above; after this, bot prints are discarded so they can never block the pipe.
+sys.stderr = sys.stdout = open(os.devnull, "w")
 out.write("ready\n")
 out.flush()
 for line in sys.stdin:

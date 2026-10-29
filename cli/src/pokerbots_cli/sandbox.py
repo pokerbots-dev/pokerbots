@@ -73,8 +73,10 @@ class ProcessBot:
         """What the bot printed before failing to start (only when stderr is a pipe)."""
         if not self.proc.stderr:
             return None
-        self.proc.wait(timeout=STARTUP)
-        return self.proc.stderr.read().decode(errors="replace").strip()
+        if self.proc.poll() is None:  # still loading after STARTUP: stop it
+            os.killpg(self.proc.pid, 9)
+        self.proc.wait()
+        return self.proc.stderr.read().decode(errors="replace").strip() or f"bot.py did not start within {STARTUP:.0f} s"
 
     def act(self, state):
         if not self.alive:

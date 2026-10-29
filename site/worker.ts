@@ -89,8 +89,22 @@ function boardTable(rows: Row[], live: boolean, minGames: number) {
   return [head, ...lines].join("\n");
 }
 
-function top(t: { min_games: number; paper: Row[]; live: Row[] }) {
+interface Players {
+  paper: number;
+  live: number;
+  needed: number;
+}
+
+const bots = (n: number) => `${n} bot${n === 1 ? "" : "s"}`;
+
+function playing(p: Players) {
+  const live = p.live >= p.needed ? `${bots(p.live)} playing` : `${bots(p.live)}, ${p.needed} needed to start`;
+  return `paper  ${bots(p.paper)}\nlive   ${live}`;
+}
+
+function top(t: { min_games: number; players: Players; paper: Row[]; live: Row[] }) {
   return page("pokerbots.dev leaderboard", "Rated poker for bots: the top bots on paper and live.", "/top", [
+    section("now playing", playing(t.players)),
     section("paper", boardTable(t.paper, false, t.min_games)),
     section("live", boardTable(t.live, true, t.min_games)),
     section("install", INSTALL, ' class="cmd"'),

@@ -1,4 +1,5 @@
 import base64
+import subprocess
 import json
 import random
 import tempfile
@@ -13,12 +14,13 @@ from pokerbots_cli.sandbox import ProcessBot, unpack
 
 HOUSE = {**STYLES, "caller": STYLES["loose"], "raiser": STYLES["solid"]}  # old names for games queued before the change
 FIRST_UID = 10000
+STARTUP_ERROR_CHARS = 2000
 
 
 def sandboxed(code, directory, uid):
     directory.mkdir()
     unpack(code, directory, uid)
-    return ProcessBot(directory, uid)
+    return ProcessBot(directory, uid, stderr=subprocess.PIPE)
 
 
 def run_game(spec):
@@ -41,7 +43,10 @@ def run_game(spec):
         "places": result.places,
         "hands": result.hands,
         "history": result.history,
-        "stats": [{"decisions": a.decisions, "late": a.late, "errors": a.errors, "slowest_ms": round(a.slowest * 1000, 2)} for a in agents],
+        "stats": [{
+            "decisions": a.decisions, "late": a.late, "errors": a.errors, "slowest_ms": round(a.slowest * 1000, 2),
+            "startup_error": (getattr(a.bot, "startup_error", None) or "")[-STARTUP_ERROR_CHARS:] or None,
+        } for a in agents],
     }
 
 
