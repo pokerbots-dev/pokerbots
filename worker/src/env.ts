@@ -19,7 +19,7 @@ export interface Env {
 
 export const SEATS = 6;
 export const BUY_IN = 100_000; // USDC micro-units: 10¢
-export const PRIZES = [370_000, 200_000];
+export const PRIZES = [390_000, 200_000];
 export const RAKE = SEATS * BUY_IN - PRIZES.reduce((a, b) => a + b);
 export const PAPER_GAMES_PER_DAY = 1000;
 export const GAMES_PER_MINUTE = 5;
