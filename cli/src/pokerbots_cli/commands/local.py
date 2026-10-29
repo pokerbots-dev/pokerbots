@@ -14,7 +14,7 @@ from ..house import BOTS
 from ..sandbox import ProcessBot, read_only_copy
 from .account import MAX_UPLOAD, bundle
 
-SAFE_MS = 10
+SAFE_MS = 8
 
 PACKAGE = resources.files("pokerbots_cli")
 
@@ -72,7 +72,7 @@ def test(args):
         ["decisions", mine.decisions],
         ["late", mine.late],
         ["errors", mine.errors],
-        ["slowest", f"{slowest:.2f} ms" + ("  servers are slower: aim under 10 ms" if slowest > SAFE_MS else "")],
+        ["slowest", f"{slowest:.2f} ms" + ("  servers are ~2.5x slower: aim under 8 ms" if slowest > SAFE_MS else "")],
         ["size", f"{size / 1e6:.2f} MB of {MAX_UPLOAD / 1e6:.0f} MB"],
     ], labels=True))
     if mine.error:

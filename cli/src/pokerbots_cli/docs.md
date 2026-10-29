@@ -26,8 +26,11 @@ money
 
   Your wallet key is ~/.config/pokerbots/wallet.json and never leaves your
   machine. Send USDC on Solana to its address, then deposit. We pay the
-  network fees. Withdrawals go to the wallet you last deposited from.
-  Large withdrawals may wait for review.
+  network fees. Deposits and withdrawals are 10¢ or more. Withdrawals go
+  to the wallet you last deposited from; large ones may wait for review.
+
+  Each live game takes its 10¢ buy-in from your balance when it is
+  seated, and a live bot keeps playing while your balance covers it.
 
 bot.py
   class Bot:
@@ -39,12 +42,16 @@ bot.py
   A new Bot is created for every game. act is called for every decision.
   Each decision gets 20 ms of CPU time, and must reply within 100 ms.
   A late reply, an error or an illegal action counts as check, or fold
-  if check is not legal. Uploads are the bot's directory, up to 5 MB
-  zipped. Bots run with the Python standard library only, no network and
-  no file writes; pb test runs them the same way.
+  if check is not legal. Servers are about 2.5x slower than a laptop:
+  keep decisions under 8 ms in pb test.
 
   Loading bot.py and Bot() get 5 seconds that do not count against the
-  20 ms: build or load lookup tables there.
+  20 ms: build or load lookup tables there. A startup error shows in
+  pb status; after startup, prints are discarded.
+
+  Uploads are the bot's directory, up to 5 MB zipped. Bots run with the
+  Python standard library only: one process, one thread, 512 MB, no
+  network and no file writes. pb test runs them the same way.
 
 actions
   ("fold",)
@@ -81,17 +88,6 @@ state
                 null unless shown down), won (chips by seat)
 
 cards
-  stacks       chips behind, by seat
-  bets         chips bet this round, by seat
-  pot          chips bet this hand
-  to_call      chips needed to call
-  legal        actions allowed now
-  min_raise    smallest raise total, when raise is legal
-  max_raise    all in, when raise is legal
-  live         seats still in the hand
-  actions      this hand so far, [cards on board, seat, action, bet this round]
-
-cards
   ranks  23456789TJQKA
   suits  cdhs
 
@@ -104,7 +100,7 @@ game
   at 100 hands, places go by chips
   20 ms CPU per decision, else check/fold
   up to 5 games a minute per bot
-  paper tables are filled with house bots; live tables are 6 players
+  paper tables are filled with house bots; live tables wait for 6 players
 
 rating
   Elo, from 1500; each game counts as a win over every bot placed below
@@ -131,7 +127,8 @@ price
           2nd      20¢
           paid in  USDC on Solana
 
-  * 18+, and only where paid skill competitions are allowed for you.
+  * 18+, and only where paid skill competitions are allowed for you;
+    pb deploy --live asks you to confirm.
     deposits are held in our Solana wallets and tracked by us until you
     withdraw.
 
