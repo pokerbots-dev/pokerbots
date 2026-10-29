@@ -1,12 +1,12 @@
 import { bearer, sha256, type User } from "./auth";
-import { ATTEST_VERSION, BUY_IN, MAX_BOT_BYTES, type Env } from "./env";
+import { ATTEST_VERSION, BUY_IN, MAX_BOT_BYTES, PAPER_GAMES_PER_DAY, SEATS, type Env } from "./env";
 import { history } from "./history";
 import { HttpError, body, type Routes } from "./http";
 import { balance, balanceOf } from "./ledger";
 import { botKey } from "./match";
 import { paused, requireActive } from "./ops";
 import { prepareDeposit, requestWithdrawal, submitDeposit, withdrawalAddress } from "./payments";
-import { BOARD_MIN_GAMES, BOARD_SIZE, board, stats } from "./public";
+import { BOARD_MIN_GAMES, BOARD_SIZE, board, players, stats } from "./public";
 import { address } from "@solana/kit";
 import { balances, chain, isAddress } from "./solana";
 
@@ -23,6 +23,17 @@ const MAX_GAMES = 1000;
 const attested = (env: Env, userId: number) =>
   env.DB.prepare("SELECT 1 FROM attestations WHERE user_id = ? AND version = ?").bind(userId, ATTEST_VERSION).first().then(Boolean);
 
+// Money not yet settled: withdrawals waiting for review or confirmation, deposits confirming.
+async function inMotion(env: Env, userId: number) {
+  const { results } = await env.DB.prepare(
+    `SELECT 'withdrawal' AS kind, amount, status FROM withdrawals WHERE user_id = ?1 AND status IN ('pending', 'approved', 'sent')
+     UNION ALL SELECT 'deposit', amount, status FROM deposits WHERE user_id = ?1 AND status = 'sent'`,
+  ).bind(userId).all();
+  return results;
+}
+
+
+
 function mode(value: unknown) {
   if (value !== "paper" && value !== "live") throw new HttpError(400, "mode is paper or live");
   return value;
@@ -30,7 +41,7 @@ function mode(value: unknown) {
 
 export const userRoutes: Routes<Ctx> = {
   async "GET /me"({ env, user }) {
-    const [versions, deployments, funds, withdrawTo, held, agreed, liveReady, publicStats, off] = await Promise.all([
+    const [versions, deployments, funds, withdrawTo, held, agreed, publicStats, off, moving, activity] = await Promise.all([
       env.DB.prepare("SELECT version FROM versions WHERE user_id = ? ORDER BY version").bind(user.id).all<{ version: number }>(),
       env.DB.prepare(
         `SELECT d.mode, d.version, r.rating, r.games,
@@ -40,7 +51,10 @@ export const userRoutes: Routes<Ctx> = {
             WHERE s.user_id = d.user_id AND g.mode = d.mode AND g.created_at >= date('now')) AS rating_today,
            CASE WHEN d.mode = 'live' THEN (SELECT COALESCE(SUM(amount), 0) FROM ledger l WHERE l.user_id = d.user_id
              AND l.created_at >= date('now') AND (l.kind IN ('buyin', 'payout') OR (l.kind = 'refund' AND l.ref NOT LIKE 'w:%'))) END AS won_today,
-           q.version_games, q.decisions, q.late, q.errors
+           q.version_games, q.decisions, q.late, q.errors,
+           (SELECT s.startup_error FROM seats s JOIN games g ON g.id = s.game_id
+            WHERE s.user_id = d.user_id AND g.mode = d.mode AND s.version = d.version AND g.status = 'done'
+            ORDER BY g.finished_at DESC LIMIT 1) AS startup_error
          FROM deployments d JOIN ratings r USING (user_id, mode)
          LEFT JOIN (SELECT g.mode, s.version, COUNT(*) AS version_games, SUM(s.decisions) AS decisions, SUM(s.late) AS late, SUM(s.errors) AS errors
                     FROM seats s JOIN games g ON g.id = s.game_id WHERE s.user_id = ?1 AND g.status = 'done' AND s.decisions IS NOT NULL
@@ -51,20 +65,22 @@ export const userRoutes: Routes<Ctx> = {
       withdrawalAddress(env, user.id),
       user.wallet ? chain(env).then((c) => balances(c, address(user.wallet!))).catch(() => null) : null,
       attested(env, user.id),
-      env.DB.prepare(`SELECT COUNT(*) AS n FROM deployments d WHERE d.mode = 'live' AND ${balanceOf("d.user_id")} >= ?`)
-        .bind(BUY_IN).first<number>("n"),
       stats(env, user.id),
       paused(env),
+      inMotion(env, user.id),
+      players(env),
     ]);
     return {
       login: user.login,
       wallet: user.wallet,
       withdraw_to: withdrawTo,
       attested: agreed,
-      live_ready: liveReady,
       buy_in: BUY_IN,
       stats: publicStats,
       paused: off,
+      moving,
+      players: activity,
+      paper_limit: PAPER_GAMES_PER_DAY,
       suspended: Boolean(user.suspended_at),
       balance: funds,
       wallet_usdc: held?.usdc ?? null,

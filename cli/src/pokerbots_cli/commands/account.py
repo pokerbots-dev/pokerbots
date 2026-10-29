@@ -1,4 +1,5 @@
 import io
+from datetime import datetime, timezone
 import pydoc
 import shutil
 import sys
@@ -90,17 +91,29 @@ def rank(me, mode):
     return f"#{st['rank']} of {st['ranked']}" if st and st["rank"] else "unranked until 20 games"
 
 
-def note(me, mode):
-    """Why live games might not be starting."""
-    if mode != "live":
-        return ""
-    if "live" in me.get("paused", []):
+def note(me, mode, d):
+    """Why a deployed bot might not be playing right now."""
+    if mode == "paper" and d["today"] >= me.get("paper_limit", float("inf")):
+        now = datetime.now(timezone.utc)
+        hours = 24 - now.hour - (now.minute > 0)
+        return f"  limit reached: {me['paper_limit']:,} today, resumes 00:00 UTC (in {hours}h)"
+    if mode == "live" and "live" in me.get("paused", []):
         return "  paused for maintenance"
-    if me["balance"] < me["buy_in"]:
+    if mode == "live" and me["balance"] < me["buy_in"]:
         return f"  paused: balance below {money(me['buy_in'])}"
-    if me["live_ready"] < SEATS:
-        return f"  waiting for players ({me['live_ready']} of {SEATS} ready)"
     return ""
+
+
+def playing(p):
+    bots = lambda n: f"{n} bot{'' if n == 1 else 's'}"
+    live = f"{bots(p['live'])} playing" if p["live"] >= p["needed"] else f"{bots(p['live'])}, {p['needed']} needed to start"
+    text = f"paper {bots(p['paper'])}   live {live}"
+    return text + ("\n" + "games are delayed on our side; nothing is wrong with your bot" if p["delayed"] else "")
+
+
+def moving(entry):
+    label = {"pending": "pending review", "approved": "sending", "sent": "confirming"}[entry["status"]]
+    return f"{entry['kind']} {money(entry['amount'])} {label}"
 
 
 def quality(d):
@@ -133,13 +146,17 @@ def report(limit=RECENT):
         if not d:
             rows.append([mode, "-"])
             continue
-        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  {rank(me, mode)}{note(me, mode)}"])
+        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  {rank(me, mode)}{note(me, mode, d)}"])
         st = me["stats"].get(mode)
         today = f"today {signed(d['rating_today'])} over {d['today']} games" + (f"   best {st['best']}" if st else "")
         if mode == "live":
             today += f"   won today {signed(d['won_today'], 'money')}" + (f", all time {signed(st['won'], 'money')}" if st and st["won"] is not None else "")
-        rows += [["", line] for line in (today, quality(d)) if line]
-    rows += [["balance", f"{money(me['balance'])} on pokerbots, for live buy-ins"], ["wallet", held(me)]]
+        broken = d.get("startup_error") and f"v{d['version']} fails to start on the servers: {d['startup_error'].splitlines()[-1]}"
+        rows += [["", line] for line in (today, quality(d), broken) if line]
+    lines = playing(me["players"]).split("\n") if me.get("players") else []
+    rows += [["players" if i == 0 else "", line] for i, line in enumerate(lines)]
+    rows += [["balance", f"{money(me['balance'])} on pokerbots, for live buy-ins"]] + [["", moving(m)] for m in me.get("moving", [])]
+    rows += [["wallet", held(me)]]
     text = table(rows, labels=True)
     games = call("GET", f"/games?limit={limit}")
     return text + ("\n\n" + game_rows(games) if games else "")

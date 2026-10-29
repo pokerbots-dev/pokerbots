@@ -1,5 +1,6 @@
 // Public, read-only stats for profile and leaderboard pages. No balances, wallets or game details.
-import type { Env } from "./env";
+import { BUY_IN, SEATS, type Env } from "./env";
+import { balanceOf } from "./ledger";
 import { HttpError, type Routes } from "./http";
 
 export const BOARD_SIZE = 20;
@@ -28,6 +29,18 @@ export async function board(env: Env, mode: string) {
 
 const publicRow = ({ user_id, ...row }: BoardRow) => row;
 
+// Bots playing now: deployed on paper, and deployed live with enough for a buy-in. delayed: games waiting > 2 min.
+export async function players(env: Env) {
+  const one = (sql: string, ...args: unknown[]) => env.DB.prepare(sql).bind(...args).first<number>("n").then((n) => n ?? 0);
+  const [paper, live, delayed] = await Promise.all([
+    one("SELECT COUNT(*) AS n FROM deployments d JOIN users u ON u.id = d.user_id WHERE d.mode = 'paper' AND u.suspended_at IS NULL"),
+    one(`SELECT COUNT(*) AS n FROM deployments d JOIN users u ON u.id = d.user_id WHERE d.mode = 'live' AND u.suspended_at IS NULL
+         AND ${balanceOf("d.user_id")} >= ?`, BUY_IN),
+    one("SELECT COUNT(*) AS n FROM games WHERE status = 'queued' AND created_at < datetime('now', '-2 minutes')"),
+  ]);
+  return { paper, live, needed: SEATS, delayed: delayed > 0 };
+}
+
 export async function stats(env: Env, userId: number) {
   const out: Record<string, unknown> = {};
   for (const mode of MODES) {
@@ -54,7 +67,12 @@ export async function stats(env: Env, userId: number) {
 export const publicRoutes: Routes<{ env: Env }> = {
   async "GET /public/top"({ env }) {
     const [paper, live] = await Promise.all(MODES.map((m) => board(env, m)));
-    return { min_games: BOARD_MIN_GAMES, paper: paper.slice(0, BOARD_SIZE).map(publicRow), live: live.slice(0, BOARD_SIZE).map(publicRow) };
+    return {
+      min_games: BOARD_MIN_GAMES,
+      players: await players(env),
+      paper: paper.slice(0, BOARD_SIZE).map(publicRow),
+      live: live.slice(0, BOARD_SIZE).map(publicRow),
+    };
   },
 
   async "GET /public/players/:login"({ env }, [login]) {
