@@ -43,7 +43,7 @@ jobs:
           node-version: 22
       - if: steps.check.outputs.present == 'true'
         working-directory: worker
-        run: npm ci && npm test --if-present && npx wrangler deploy --dry-run
+        run: npm ci && npm test && npx wrangler deploy --env staging --dry-run && npx wrangler deploy --env production --dry-run
 
   # Single required status check for branch protection.
   ci:
