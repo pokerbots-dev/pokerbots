@@ -6,10 +6,11 @@ from pathlib import Path
 
 from .. import auth
 from ..api import call
-from ..fmt import INK, PAPER, colored, money, place, signed, table, when
+from ..fmt import INK, PAPER, colored, held, money, place, signed, table, when
 
 MAX_UPLOAD = 1 << 20
 WATCH_SECONDS = 5
+SEATS = 6
 ATTEST = "I am 18 or older, and paid skill competitions are allowed where I am. [y/N] "
 
 
@@ -43,7 +44,11 @@ def upload(args):
 def deploy(args):
     mode = "live" if args.live else "paper"
     if mode == "live" and not call("GET", "/me")["attested"]:
-        if input(ATTEST).strip().lower() != "y":
+        try:
+            agreed = input(ATTEST).strip().lower() == "y"
+        except EOFError:
+            agreed = False
+        if not agreed:
             sys.exit("not deployed")
         call("POST", "/attest")
     call("POST", "/deployments", {"mode": mode, "version": int(args.version.lstrip("v"))})
@@ -61,13 +66,24 @@ def rank(mode):
     return f"#{board['you']} of {board['ranked']}" if board["you"] else f"unranked until {board['min_games']} games"
 
 
+def note(me, mode):
+    """Why live games might not be starting."""
+    if mode != "live":
+        return ""
+    if me["balance"] < me["buy_in"]:
+        return f"  paused: balance below {money(me['buy_in'])}"
+    if me["live_ready"] < SEATS:
+        return f"  waiting for players ({me['live_ready']} of {SEATS} ready)"
+    return ""
+
+
 def report():
     me = call("GET", "/me")
     rows = [["user", me["login"]], ["versions", " ".join(f"v{v}" for v in me["versions"]) or "-"]]
     for mode in ("paper", "live"):
         d = me["deployments"].get(mode)
-        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}  {rank(mode)}" if d else "-"])
-    rows += [["balance", money(me["balance"])], ["wallet", me["wallet"] or "-"]]
+        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}  {rank(mode)}{note(me, mode)}" if d else "-"])
+    rows += [["balance", f"{money(me['balance'])} on pokerbots, for live buy-ins"], ["wallet", held(me)]]
     text = table(rows, labels=True)
     games = call("GET", "/games")
     if games:

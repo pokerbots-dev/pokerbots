@@ -83,10 +83,12 @@ export async function status(c: Chain, signature: string, lastValid: number): Pr
   return "pending";
 }
 
-export async function hotBalances(c: Chain) {
+export const hotBalances = (c: Chain) => balances(c, c.hot.address);
+
+export async function balances(c: Chain, owner: Address) {
   const [{ value: lamports }, usdc] = await Promise.all([
-    c.rpc.getBalance(c.hot.address).send(),
-    tokenAccount(c, c.hot.address)
+    c.rpc.getBalance(owner).send(),
+    tokenAccount(c, owner)
       .then((a) => c.rpc.getTokenAccountBalance(a).send())
       .then((r) => Number(r.value.amount))
       .catch(() => 0),

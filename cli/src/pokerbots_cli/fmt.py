@@ -35,6 +35,16 @@ def money(micro):
     return f"{cents}¢" if abs(cents) < 100 else f"{sign}${abs(cents) / 100:,.2f}"
 
 
+def held(me):
+    """The wallet line: USDC in the player's own wallet, with a hint when it is SOL instead."""
+    if me.get("wallet_usdc") is None:
+        return "-"
+    text = f"{money(me['wallet_usdc'])} USDC in your wallet, ready to deposit"
+    if not me["wallet_usdc"] and me.get("wallet_sol"):
+        text += f" ({me['wallet_sol']} SOL there; deposits need USDC)"
+    return text
+
+
 def signed(value, unit=""):
     if value is None:
         return "-"

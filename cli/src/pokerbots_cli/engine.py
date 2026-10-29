@@ -158,7 +158,8 @@ class Hand:
         for level in sorted({p.committed for p in self.players}):
             pot = sum(min(p.committed, level) - min(p.committed, previous) for p in self.players)
             previous = level
-            eligible = [p for p in live if p.committed >= level]
+            # nobody live matched this level: the chips were uncalled and go back to whoever bet them
+            eligible = [p for p in live if p.committed >= level] or [p for p in self.players if p.committed >= level]
             top = max(strength.get(p.seat, ()) for p in eligible)
             winners = [p for p in eligible if strength.get(p.seat, ()) == top]
             share, odd = divmod(pot, len(winners))

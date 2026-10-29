@@ -13,6 +13,7 @@ start
   pb top [--live]            leaderboard: rating order, 20+ games; live shows won
   pb history                 download your finished games, see history below
   pb docs [--plain]          show this
+  pb upgrade                 upgrade pb
 
 money
   pb wallet                  your Solana wallet address and balance

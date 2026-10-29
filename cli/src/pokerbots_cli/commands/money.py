@@ -2,7 +2,7 @@ import sys
 
 from .. import wallet as keys
 from ..api import call
-from ..fmt import money, parse_money, table
+from ..fmt import held, money, parse_money, table
 
 
 def registered_key():
@@ -16,10 +16,12 @@ def registered_key():
 
 def wallet(args):
     _, address, me = registered_key()
-    rows = [["address", address], ["balance", money(me["balance"])]]
+    me = call("GET", "/me")
+    yours = [["address", address], ["send", "USDC on Solana only (not SOL)"], ["wallet", held(me)]]
+    ours = [["balance", f"{money(me['balance'])} on pokerbots, for live buy-ins"]]
     if me["withdraw_to"] and me["withdraw_to"] != address:
-        rows.append(["withdraws to", me["withdraw_to"]])
-    print(table(rows, labels=True))
+        ours.append(["withdraws to", me["withdraw_to"]])
+    print(table(yours, labels=True) + "\n" + "-" * 3 + "\n" + table(ours, labels=True))
 
 
 def deposit(args):

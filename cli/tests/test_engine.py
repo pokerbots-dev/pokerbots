@@ -2,7 +2,7 @@ import random
 
 from pokerbots_cli import engine
 from pokerbots_cli.agent import Agent
-from pokerbots_cli.house import BOTS, Raiser
+from pokerbots_cli.house import BOTS, Loose
 
 
 def shove(state):
@@ -14,7 +14,7 @@ def shove(state):
 def test_games_conserve_chips_and_rank_everyone():
     rng = random.Random(1)
     for _ in range(20):
-        result = engine.play([Agent(Raiser(rng))] + [Agent(cls()) for cls in BOTS], rng)
+        result = engine.play([Agent(Loose(rng))] + [Agent(cls()) for cls in BOTS], rng)
         assert sum(result.stacks) == 6 * engine.STACK
         assert sorted(result.places) == list(range(6))
         assert result.hands <= engine.MAX_HANDS
@@ -51,3 +51,9 @@ def test_state_and_history():
     for h in result.history:
         assert sum(h["won"]) > 0
         assert all(h["shown"][s] in (None, h["hole"][s]) for s in range(6))
+
+
+def test_uncalled_chips_return():
+    players = [engine.Player(0, lambda s: ("fold",), 14), engine.Player(1, lambda s: ("fold",), 1000)]
+    engine.Hand(67, players, 1, list(engine.DECK), engine.Game(["a", "b"])).play()
+    assert [p.stack for p in players] == [28, 986]

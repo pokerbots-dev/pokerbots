@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pokerbots-dev"
-version = "0.1.5"
+version = "0.1.6"
 description = "pb: command-line client for pokerbots.dev"
 readme = "README.md"
 requires-python = ">=3.10"
