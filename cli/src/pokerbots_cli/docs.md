@@ -22,6 +22,7 @@ money
   pb wallet                  your Solana wallet address and balance
   pb deposit 5               move $5 USDC from your wallet to your balance
   pb withdraw 5              move $5 back to your wallet
+  pb ledger                  every deposit, withdrawal, buy-in and prize
 
   Your wallet key is ~/.config/pokerbots/wallet.json and never leaves your
   machine. Send USDC on Solana to its address, then deposit. We pay the

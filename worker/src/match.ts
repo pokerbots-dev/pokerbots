@@ -1,5 +1,6 @@
 import { BUY_IN, GAMES_PER_MINUTE, PAPER_GAMES_PER_DAY, PRIZES, RAKE, RUNNERS, SEATS, type Env } from "./env";
 import { balanceOf, credit, debit } from "./ledger";
+import { paused } from "./ops";
 import { elo } from "./rating";
 import { tables } from "./seating";
 
@@ -42,7 +43,9 @@ export const historyKey = (gameId: string) => `games/${gameId}.json.gz`;
 const gzip = (text: string) => new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
 
 export async function matchmake(env: Env) {
+  const off = await paused(env);
   for (const mode of ["paper", "live"] as const) {
+    if (mode === "live" && off.includes("live")) continue;
     const { results: bots } = await env.DB.prepare(
       `SELECT d.user_id, d.version,
          COUNT(g.id) FILTER (WHERE g.status != 'failed' AND g.created_at >= date('now')) AS today,
@@ -51,7 +54,8 @@ export async function matchmake(env: Env) {
        FROM deployments d
        LEFT JOIN seats s ON s.user_id = d.user_id
        LEFT JOIN games g ON g.id = s.game_id AND g.mode = d.mode AND (g.created_at >= date('now') OR g.status = 'queued')
-       WHERE d.mode = ? GROUP BY d.user_id`,
+       JOIN users u ON u.id = d.user_id
+       WHERE d.mode = ? AND u.suspended_at IS NULL GROUP BY d.user_id`,
     ).bind(mode).all<Bot>();
     for (let round = 0; round < GAMES_PER_MINUTE; round++) {
       const eligible = bots.filter(

@@ -4,6 +4,7 @@ import { history } from "./history";
 import { HttpError, body, type Routes } from "./http";
 import { balance, balanceOf } from "./ledger";
 import { botKey } from "./match";
+import { paused, requireActive } from "./ops";
 import { prepareDeposit, requestWithdrawal, submitDeposit, withdrawalAddress } from "./payments";
 import { BOARD_MIN_GAMES, BOARD_SIZE, board, stats } from "./public";
 import { address } from "@solana/kit";
@@ -29,7 +30,7 @@ function mode(value: unknown) {
 
 export const userRoutes: Routes<Ctx> = {
   async "GET /me"({ env, user }) {
-    const [versions, deployments, funds, withdrawTo, held, agreed, liveReady, publicStats] = await Promise.all([
+    const [versions, deployments, funds, withdrawTo, held, agreed, liveReady, publicStats, off] = await Promise.all([
       env.DB.prepare("SELECT version FROM versions WHERE user_id = ? ORDER BY version").bind(user.id).all<{ version: number }>(),
       env.DB.prepare(
         `SELECT d.mode, d.version, r.rating, r.games,
@@ -49,6 +50,7 @@ export const userRoutes: Routes<Ctx> = {
       env.DB.prepare(`SELECT COUNT(*) AS n FROM deployments d WHERE d.mode = 'live' AND ${balanceOf("d.user_id")} >= ?`)
         .bind(BUY_IN).first<number>("n"),
       stats(env, user.id),
+      paused(env),
     ]);
     return {
       login: user.login,
@@ -58,6 +60,8 @@ export const userRoutes: Routes<Ctx> = {
       live_ready: liveReady,
       buy_in: BUY_IN,
       stats: publicStats,
+      paused: off,
+      suspended: Boolean(user.suspended_at),
       balance: funds,
       wallet_usdc: held?.usdc ?? null,
       wallet_sol: held?.sol ?? null,
@@ -67,6 +71,7 @@ export const userRoutes: Routes<Ctx> = {
   },
 
   async "POST /versions"({ req, env, user }) {
+    requireActive(user);
     const data = await req.arrayBuffer();
     if (data.byteLength > MAX_BOT_BYTES) throw new HttpError(413, "bot is over 1 MB zipped");
     if (data.byteLength < 4 || new DataView(data).getUint32(0, true) !== ZIP_MAGIC) throw new HttpError(400, "not a zip");
@@ -83,6 +88,7 @@ export const userRoutes: Routes<Ctx> = {
   },
 
   async "POST /deployments"({ req, env, user }) {
+    requireActive(user);
     const input = await body<{ mode: unknown; version: unknown }>(req);
     const m = mode(input.mode);
     if (m === "live" && !(await attested(env, user.id))) throw new HttpError(403, "live play needs the 18+ and location confirmation");
@@ -146,6 +152,18 @@ export const userRoutes: Routes<Ctx> = {
       you: rank || null,
       rows: rows.slice(0, BOARD_SIZE).map(({ user_id, ...row }) => row),
     };
+  },
+
+  // Every money movement on the account, newest first; tx is the Solana signature for deposits and withdrawals.
+  async "GET /ledger"({ req, env, user }) {
+    const limit = Math.min(Math.max(Number(new URL(req.url).searchParams.get("limit")) || 100, 1), MAX_GAMES);
+    const { results } = await env.DB.prepare(
+      `SELECT l.created_at, l.kind, l.amount, l.note,
+         CASE l.kind WHEN 'deposit' THEN l.ref
+                     WHEN 'withdrawal' THEN (SELECT signature FROM withdrawals WHERE id = l.ref) END AS tx
+       FROM ledger l WHERE l.user_id = ? ORDER BY l.id DESC LIMIT ?`,
+    ).bind(user.id, limit).all();
+    return { balance: await balance(env, user.id), cluster: env.SOLANA_CLUSTER, entries: results };
   },
 
   async "GET /history"({ req, env, user }) {
