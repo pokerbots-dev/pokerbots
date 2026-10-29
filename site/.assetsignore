@@ -5,3 +5,5 @@ STYLE.md
 node_modules
 package.json
 package-lock.json
+worker.ts
+tsconfig.json

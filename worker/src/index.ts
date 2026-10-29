@@ -6,6 +6,7 @@ import type { Env } from "./env";
 import { HttpError, route } from "./http";
 import { failGame, matchmake, runGame } from "./match";
 import { reconcile } from "./payments";
+import { publicRoutes } from "./public";
 
 export { Runner } from "./runner";
 
@@ -15,6 +16,11 @@ const ALERT_EVERY_MINUTES = 10;
 async function handle(req: Request, env: Env): Promise<unknown> {
   const { pathname } = new URL(req.url);
   if (pathname === "/health") return { ok: true, cluster: env.SOLANA_CLUSTER };
+  if (pathname.startsWith("/public/")) {
+    const match = route(publicRoutes, req.method, pathname);
+    if (!match) throw new HttpError(404, "not found");
+    return match[0]({ env }, match[1]);
+  }
   if (pathname.startsWith("/admin/")) {
     const match = route(adminRoutes, req.method, pathname);
     if (!match) throw new HttpError(404, "not found");

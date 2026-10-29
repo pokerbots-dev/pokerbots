@@ -5,6 +5,7 @@ import { HttpError, body, type Routes } from "./http";
 import { balance, balanceOf } from "./ledger";
 import { botKey } from "./match";
 import { prepareDeposit, requestWithdrawal, submitDeposit, withdrawalAddress } from "./payments";
+import { BOARD_MIN_GAMES, BOARD_SIZE, board, stats } from "./public";
 import { address } from "@solana/kit";
 import { balances, chain, isAddress } from "./solana";
 
@@ -16,8 +17,7 @@ interface Ctx {
 
 const ZIP_MAGIC = 0x04034b50;
 const RECENT_GAMES = 10;
-const BOARD_SIZE = 20;
-const BOARD_MIN_GAMES = 20;
+const MAX_GAMES = 1000;
 
 const attested = (env: Env, userId: number) =>
   env.DB.prepare("SELECT 1 FROM attestations WHERE user_id = ? AND version = ?").bind(userId, ATTEST_VERSION).first().then(Boolean);
@@ -29,13 +29,18 @@ function mode(value: unknown) {
 
 export const userRoutes: Routes<Ctx> = {
   async "GET /me"({ env, user }) {
-    const [versions, deployments, funds, withdrawTo, held, agreed, liveReady] = await Promise.all([
+    const [versions, deployments, funds, withdrawTo, held, agreed, liveReady, publicStats] = await Promise.all([
       env.DB.prepare("SELECT version FROM versions WHERE user_id = ? ORDER BY version").bind(user.id).all<{ version: number }>(),
       env.DB.prepare(
         `SELECT d.mode, d.version, r.rating, r.games,
            (SELECT COUNT(*) FROM seats s JOIN games g ON g.id = s.game_id
-            WHERE s.user_id = d.user_id AND g.mode = d.mode AND g.status != 'failed' AND g.created_at >= date('now')) AS today
-         FROM deployments d JOIN ratings r USING (user_id, mode) WHERE d.user_id = ?`,
+            WHERE s.user_id = d.user_id AND g.mode = d.mode AND g.status != 'failed' AND g.created_at >= date('now')) AS today,
+           q.version_games, q.decisions, q.late, q.errors
+         FROM deployments d JOIN ratings r USING (user_id, mode)
+         LEFT JOIN (SELECT g.mode, s.version, COUNT(*) AS version_games, SUM(s.decisions) AS decisions, SUM(s.late) AS late, SUM(s.errors) AS errors
+                    FROM seats s JOIN games g ON g.id = s.game_id WHERE s.user_id = ?1 AND g.status = 'done' AND s.decisions IS NOT NULL
+                    GROUP BY g.mode, s.version) q ON q.mode = d.mode AND q.version = d.version
+         WHERE d.user_id = ?1`,
       ).bind(user.id).all<{ mode: string }>(),
       balance(env, user.id),
       withdrawalAddress(env, user.id),
@@ -43,6 +48,7 @@ export const userRoutes: Routes<Ctx> = {
       attested(env, user.id),
       env.DB.prepare(`SELECT COUNT(*) AS n FROM deployments d WHERE d.mode = 'live' AND ${balanceOf("d.user_id")} >= ?`)
         .bind(BUY_IN).first<number>("n"),
+      stats(env, user.id),
     ]);
     return {
       login: user.login,
@@ -51,6 +57,7 @@ export const userRoutes: Routes<Ctx> = {
       attested: agreed,
       live_ready: liveReady,
       buy_in: BUY_IN,
+      stats: publicStats,
       balance: funds,
       wallet_usdc: held?.usdc ?? null,
       wallet_sol: held?.sol ?? null,
@@ -111,32 +118,28 @@ export const userRoutes: Routes<Ctx> = {
     return { wallet: address };
   },
 
-  async "GET /games"({ env, user }) {
+  async "GET /games"({ req, env, user }) {
+    const q = new URL(req.url).searchParams;
+    const limit = Math.min(Math.max(Number(q.get("limit")) || RECENT_GAMES, 1), MAX_GAMES);
+    const m = q.get("mode") ? mode(q.get("mode")) : null;
     const { results } = await env.DB.prepare(
-      `SELECT g.id, g.mode, g.status, g.hands, g.created_at, s.place, s.rating_delta,
+      `SELECT g.id, g.mode, g.status, g.hands, g.created_at, s.version, s.place, s.rating_delta, s.late, s.errors, s.decisions,
          CASE WHEN g.mode = 'live' THEN (SELECT COALESCE(SUM(amount), 0) FROM ledger
            WHERE user_id = s.user_id AND ref = g.id || ':' || s.seat AND kind IN ('buyin', 'payout', 'refund')) END AS net
        FROM seats s JOIN games g ON g.id = s.game_id
-       WHERE s.user_id = ? ORDER BY g.created_at DESC LIMIT ?`,
-    ).bind(user.id, RECENT_GAMES).all();
+       WHERE s.user_id = ?1 AND (?2 IS NULL OR g.mode = ?2) ORDER BY g.created_at DESC LIMIT ?3`,
+    ).bind(user.id, m, limit).all();
     return results;
   },
 
-  // Ranked by rating; won is live table results only (buy-ins, payouts, game refunds).
   async "GET /leaderboard/:mode"({ env, user }, [m]) {
-    const { results } = await env.DB.prepare(
-      `SELECT u.login, r.user_id, ROUND(r.rating) AS rating, r.games,
-         CASE WHEN r.mode = 'live' THEN (SELECT COALESCE(SUM(amount), 0) FROM ledger l WHERE l.user_id = r.user_id
-           AND (l.kind IN ('buyin', 'payout') OR (l.kind = 'refund' AND l.ref NOT LIKE 'w:%'))) END AS won
-       FROM ratings r JOIN users u ON u.id = r.user_id
-       WHERE r.mode = ? AND r.games >= ? ORDER BY r.rating DESC`,
-    ).bind(mode(m), BOARD_MIN_GAMES).all<{ user_id: number }>();
-    const rank = results.findIndex((r) => r.user_id === user.id) + 1;
+    const rows = await board(env, mode(m));
+    const rank = rows.findIndex((r) => r.user_id === user.id) + 1;
     return {
       min_games: BOARD_MIN_GAMES,
-      ranked: results.length,
+      ranked: rows.length,
       you: rank || null,
-      rows: results.slice(0, BOARD_SIZE).map(({ user_id, ...row }) => row),
+      rows: rows.slice(0, BOARD_SIZE).map(({ user_id, ...row }) => row),
     };
   },
 

@@ -9,6 +9,7 @@ start
   pb deploy v1 --live        play for money with v1
   pb stop --paper|--live     stop playing; queued games still play
   pb status                  versions, rating, balance, recent games
+  pb games [-n 100]          past games in a pager; --paper or --live
   pb watch                   the same, refreshed every 5 seconds
   pb top [--live]            leaderboard: rating order, 20+ games; live shows won
   pb history                 download your finished games, see history below

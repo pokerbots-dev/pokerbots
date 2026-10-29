@@ -30,7 +30,7 @@ interface Outcome {
   places: number[];
   hands: number;
   history: unknown[];
-  stats: { late: number; errors: number }[];
+  stats: { late: number; errors: number; decisions?: number }[];
 }
 
 const HOUSE = ["tight", "loose", "solid"];
@@ -130,10 +130,10 @@ async function record(env: Env, game: Game, seats: Seat[], outcome: Outcome) {
 
   const statements = outcome.places.flatMap((seat, i) => {
     const { user_id } = seats[seat];
-    const { late, errors } = outcome.stats[seat];
+    const { late, errors, decisions = null } = outcome.stats[seat];
     const out = [
-      env.DB.prepare("UPDATE seats SET place = ?, late = ?, errors = ?, rating_delta = ? WHERE game_id = ? AND seat = ?")
-        .bind(i + 1, late, errors, user_id ? deltas[i] : null, game.id, seat),
+      env.DB.prepare("UPDATE seats SET place = ?, late = ?, errors = ?, decisions = ?, rating_delta = ? WHERE game_id = ? AND seat = ?")
+        .bind(i + 1, late, errors, decisions, user_id ? deltas[i] : null, game.id, seat),
     ];
     if (user_id) {
       out.push(
