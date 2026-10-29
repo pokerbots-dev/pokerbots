@@ -1,5 +1,5 @@
 // Always deploy with --env staging or --env production; the bare worker is unused.
-// Secrets per env: SOLANA_RPC_URL, HOT_WALLET_KEY (wrangler secret put NAME --env ...).
+// Secrets per env: SOLANA_RPC_URL, HOT_WALLET_KEY, ALERT_EMAIL (wrangler secret put NAME --env ...).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pokerbots",
@@ -28,6 +28,7 @@
         "consumers": [{ "queue": "pokerbots-games-staging", "max_batch_size": 10, "max_retries": 3 }]
       },
       "triggers": { "crons": ["* * * * *"] },
+      "send_email": [{ "name": "EMAIL" }],
       "durable_objects": { "bindings": [{ "name": "RUNNER", "class_name": "Runner" }] },
       "containers": [{ "class_name": "Runner", "scheduling_policy": "durable_object", "observability": { "logs": { "enabled": true } }, "images": { "runner": { "dockerfile": "../runner/Dockerfile", "build_context": ".." } } }],
       "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Runner"] }]
@@ -52,6 +53,7 @@
         "consumers": [{ "queue": "pokerbots-games-production", "max_batch_size": 10, "max_retries": 3 }]
       },
       "triggers": { "crons": ["* * * * *"] },
+      "send_email": [{ "name": "EMAIL" }],
       "durable_objects": { "bindings": [{ "name": "RUNNER", "class_name": "Runner" }] },
       "containers": [{ "class_name": "Runner", "scheduling_policy": "durable_object", "observability": { "logs": { "enabled": true } }, "images": { "runner": { "dockerfile": "../runner/Dockerfile", "build_context": ".." } } }],
       "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Runner"] }]

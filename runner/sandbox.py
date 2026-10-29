@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path
 from time import monotonic
 
-from pokerbots_cli.agent import LIMIT
+from pokerbots_cli.agent import WALL
 
 HOST = Path(__file__).with_name("host.py")
 STARTUP = 5.0
@@ -44,9 +44,9 @@ def confine(uid):
 
 
 class ProcessBot:
-    """A bot in its own process and user; act() never waits longer than the limit."""
+    """A bot in its own process and user; act() never waits longer than the wall limit."""
 
-    def __init__(self, code, directory, uid, limit=LIMIT):
+    def __init__(self, code, directory, uid, limit=WALL):
         directory.mkdir()
         unpack(code, directory, uid)
         self.limit = limit
@@ -78,6 +78,13 @@ class ProcessBot:
                     raise RuntimeError(reply["error"])
                 return reply["action"]
         return None
+
+    def cpu(self):
+        """Seconds of CPU the bot process has used, read by the kernel so the bot cannot fake it."""
+        try:
+            return int(Path(f"/proc/{self.proc.pid}/schedstat").read_text().split()[0]) / 1e9
+        except (OSError, ValueError):
+            return monotonic()
 
     def read(self, deadline):
         fd = self.proc.stdout.fileno()

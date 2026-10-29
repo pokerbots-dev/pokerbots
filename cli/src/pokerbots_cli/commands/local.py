@@ -58,9 +58,9 @@ def test(args):
         ["2nd", places.count(2)],
         ["avg place", f"{sum(places) / len(places):.1f}"],
         ["decisions", mine.decisions],
-        ["over 20 ms", mine.late],
+        ["late", mine.late],
         ["errors", mine.errors],
-        ["slowest", f"{mine.slowest * 1000:.2f} ms"],
+        ["slowest", f"{mine.slowest * 1000:.2f} ms cpu"],
     ]))
     if mine.error:
         print(f"\nfirst error\n{mine.error}")

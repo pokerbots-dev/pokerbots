@@ -3,7 +3,7 @@ import { MAX_BOT_BYTES, type Env } from "./env";
 import { HttpError, body, type Routes } from "./http";
 import { balance } from "./ledger";
 import { botKey } from "./match";
-import { prepareDeposit, requestWithdrawal, submitDeposit } from "./payments";
+import { prepareDeposit, requestWithdrawal, submitDeposit, withdrawalAddress } from "./payments";
 import { isAddress } from "./solana";
 
 interface Ctx {
@@ -22,7 +22,7 @@ function mode(value: unknown) {
 
 export const userRoutes: Routes<Ctx> = {
   async "GET /me"({ env, user }) {
-    const [versions, deployments, funds] = await Promise.all([
+    const [versions, deployments, funds, withdrawTo] = await Promise.all([
       env.DB.prepare("SELECT version FROM versions WHERE user_id = ? ORDER BY version").bind(user.id).all<{ version: number }>(),
       env.DB.prepare(
         `SELECT d.mode, d.version, r.rating, r.games,
@@ -31,10 +31,12 @@ export const userRoutes: Routes<Ctx> = {
          FROM deployments d JOIN ratings r USING (user_id, mode) WHERE d.user_id = ?`,
       ).bind(user.id).all<{ mode: string }>(),
       balance(env, user.id),
+      withdrawalAddress(env, user.id),
     ]);
     return {
       login: user.login,
       wallet: user.wallet,
+      withdraw_to: withdrawTo,
       attested: Boolean(user.attested_at),
       balance: funds,
       versions: versions.results.map((v) => v.version),

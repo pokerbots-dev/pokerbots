@@ -1,3 +1,5 @@
+import sys
+
 from .. import wallet as keys
 from ..api import call
 from ..fmt import money, parse_money, table
@@ -6,25 +8,32 @@ from ..fmt import money, parse_money, table
 def registered_key():
     key = keys.load_or_create()
     address = keys.address(key)
-    if call("GET", "/me")["wallet"] != address:
+    me = call("GET", "/me")
+    if me["wallet"] != address:
         call("PUT", "/wallet", {"address": address})
-    return key, address
+    return key, address, me
 
 
 def wallet(args):
-    _, address = registered_key()
-    print(table([["address", address], ["balance", money(call("GET", "/me")["balance"])]]))
+    _, address, me = registered_key()
+    rows = [["address", address], ["balance", money(me["balance"])]]
+    if me["withdraw_to"] and me["withdraw_to"] != address:
+        rows.append(["withdraws to", me["withdraw_to"]])
+    print(table(rows, labels=True))
 
 
 def deposit(args):
-    key, _ = registered_key()
+    key, _, _ = registered_key()
     prepared = call("POST", "/deposits", {"amount": parse_money(args.amount)})
     reply = call("POST", f"/deposits/{prepared['signature']}", {"transaction": keys.sign(prepared["transaction"], key)})
     print(f"deposit {reply['status']}: {money(reply['amount'])}")
 
 
 def withdraw(args):
-    registered_key()
+    _, address, me = registered_key()
+    if me["withdraw_to"] and me["withdraw_to"] != address:
+        sys.exit(f"withdrawals go to {me['withdraw_to']}, the wallet you last deposited from.\n"
+                 f"to use this wallet instead, deposit from it once: pb deposit 0.10")
     reply = call("POST", "/withdrawals", {"amount": parse_money(args.amount)})
     print(f"withdrawal {reply['status']}: {money(reply['amount'])}")
 

@@ -35,7 +35,7 @@ def call(method, path, body=None, data=None, headers=None):
             message = f"{e.code} {e.reason}"
         raise ApiError(message) from None
     except urllib.error.URLError as e:
-        raise ApiError(str(e.reason)) from None
+        raise ApiError(f"cannot reach {base()}: {e.reason}") from None
 
 
 def admin(method, path, body=None):

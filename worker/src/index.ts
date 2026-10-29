@@ -1,4 +1,5 @@
 import { adminRoutes } from "./admin";
+import { checkAlerts } from "./alerts";
 import { userRoutes } from "./api";
 import { authenticate, authenticateAdmin } from "./auth";
 import type { Env } from "./env";
@@ -9,6 +10,7 @@ import { reconcile } from "./payments";
 export { Runner } from "./runner";
 
 const MAX_ATTEMPTS = 3;
+const ALERT_EVERY_MINUTES = 10;
 
 async function handle(req: Request, env: Env): Promise<unknown> {
   const { pathname } = new URL(req.url);
@@ -35,8 +37,9 @@ export default {
     }
   },
 
-  async scheduled(_, env, ctx) {
-    const jobs = await Promise.allSettled([matchmake(env), reconcile(env)]);
+  async scheduled(event, env) {
+    const alerts = new Date(event.scheduledTime).getUTCMinutes() % ALERT_EVERY_MINUTES === 0 ? checkAlerts(env) : null;
+    const jobs = await Promise.allSettled([matchmake(env), reconcile(env), alerts]);
     jobs.forEach((j) => j.status === "rejected" && console.error(j.reason));
   },
 

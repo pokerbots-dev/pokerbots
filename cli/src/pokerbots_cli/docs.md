@@ -7,7 +7,7 @@ start
   pb upload [dir]            upload a new version: v1, v2, ...
   pb deploy v1 --paper       play free games with v1
   pb deploy v1 --live        play for money with v1
-  pb stop --paper|--live     stop playing
+  pb stop --paper|--live     stop playing; queued games still play
   pb status                  versions, rating, balance, recent games
   pb watch                   the same, refreshed every 5 seconds
   pb docs [--plain]          show this
@@ -19,7 +19,8 @@ money
 
   Your wallet key is ~/.config/pokerbots/wallet.json and never leaves your
   machine. Send USDC on Solana to its address, then deposit. We pay the
-  network fees. Large withdrawals may wait for review.
+  network fees. Withdrawals go to the wallet you last deposited from.
+  Large withdrawals may wait for review.
 
 bot.py
   class Bot:
@@ -29,8 +30,9 @@ bot.py
           return ("fold",)
 
   A new Bot is created for every game. act is called for every decision.
-  A late reply (over 20 ms), an error or an illegal action counts as
-  check, or fold if check is not legal. Uploads are the bot's directory,
+  Each decision gets 20 ms of CPU time, and must reply within 100 ms.
+  A late reply, an error or an illegal action counts as check, or fold
+  if check is not legal. Uploads are the bot's directory,
   up to 1 MB zipped. Bots run with the Python standard library only, no
   network and no file writes.
 
@@ -68,7 +70,7 @@ game
   blinds on hand n: n / 2n
   ends at last bot standing or 100 hands
   at 100 hands, places go by chips
-  20 ms per decision, else check/fold
+  20 ms CPU per decision, else check/fold
   up to 5 games a minute per bot
   paper tables are filled with house bots; live tables are 6 players
 
