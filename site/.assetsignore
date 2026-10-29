@@ -2,3 +2,6 @@
 wrangler.jsonc
 STYLE.md
 .wrangler
+node_modules
+package.json
+package-lock.json
