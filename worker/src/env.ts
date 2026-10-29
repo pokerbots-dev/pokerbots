@@ -13,6 +13,8 @@ export interface Env {
   WITHDRAW_TOTAL_DAILY_CAP: string; // dollars
   ACCESS_TEAM: string;
   ACCESS_AUD: string;
+  EMAIL?: SendEmail;
+  ALERT_EMAIL?: string; // secret: where alerts go (a verified Email Routing destination)
 }
 
 export const SEATS = 6;

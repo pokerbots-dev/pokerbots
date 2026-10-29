@@ -53,7 +53,7 @@ def deploy(args):
 def stop(args):
     mode = "live" if args.live else "paper"
     call("DELETE", f"/deployments/{mode}")
-    print(f"stopped {mode}")
+    print(f"stopped {mode}; games already queued will still play")
 
 
 def report():

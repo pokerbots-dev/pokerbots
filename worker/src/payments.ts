@@ -36,8 +36,8 @@ export async function prepareDeposit(env: Env, user: User, value: unknown) {
   const amount = checkAmount(value, BUY_IN);
   const c = await chain(env);
   const tx = await transfer(c, wallet(user), c.hot.address, amount);
-  await env.DB.prepare("INSERT INTO deposits (signature, user_id, amount, last_valid, status) VALUES (?, ?, ?, ?, 'prepared')")
-    .bind(tx.signature, user.id, amount, tx.lastValid).run();
+  await env.DB.prepare("INSERT INTO deposits (signature, user_id, amount, last_valid, status, address) VALUES (?, ?, ?, ?, 'prepared', ?)")
+    .bind(tx.signature, user.id, amount, tx.lastValid, user.wallet).run();
   return { signature: tx.signature, transaction: tx.wire };
 }
 
@@ -50,7 +50,7 @@ export async function submitDeposit(env: Env, user: User, signature: string, wir
   const c = await chain(env);
   await send(c, wire).catch(async (e) => {
     await env.DB.prepare("UPDATE deposits SET status = 'failed' WHERE signature = ?").bind(signature).run();
-    throw new HttpError(400, `rejected by Solana: ${e.cause?.message ?? e.message}`);
+    throw new HttpError(400, reason(e));
   });
   for (let i = 0; i < CONFIRM_POLLS; i++) {
     const result = await settleDeposit(env, c, deposit);
@@ -69,9 +69,27 @@ async function settleDeposit(env: Env, c: Chain, d: Deposit) {
   return next;
 }
 
+// Solana's simulation errors, in words a player can act on.
+function reason(e: { message?: string; cause?: { message?: string }; context?: unknown }) {
+  const text = `${e.message} ${e.cause?.message} ${JSON.stringify(e.context ?? "")}`.toLowerCase();
+  if (/insufficient funds|0x1\b|"custom":1\b/.test(text)) return "not enough USDC in your wallet";
+  if (/accountnotfound|could not find account|invalid account data|0xbc4|uninitialized/.test(text)) return "your wallet has no USDC yet: send USDC on Solana to it first";
+  if (/blockhash/.test(text)) return "the transaction expired; try again";
+  if (/signature/.test(text)) return "the transaction was changed after we built it";
+  return "Solana rejected the deposit; try again";
+}
+
+// Withdrawals go to the wallet the user last deposited from: its USDC account already exists,
+// so withdrawing costs us nothing, and a stolen login cannot redirect funds.
+export async function withdrawalAddress(env: Env, userId: number) {
+  return env.DB.prepare("SELECT address FROM deposits WHERE user_id = ? AND status = 'credited' AND address IS NOT NULL ORDER BY created_at DESC LIMIT 1")
+    .bind(userId).first<string>("address");
+}
+
 export async function requestWithdrawal(env: Env, user: User, value: unknown) {
   const amount = checkAmount(value, BUY_IN);
-  const to = wallet(user);
+  const to = await withdrawalAddress(env, user.id);
+  if (!to) throw new HttpError(400, "deposit first: withdrawals go to the wallet you deposited from");
   const id = crypto.randomUUID();
   const counted = "status IN ('approved', 'sent', 'done') AND created_at >= date('now')";
   const [inserted] = await env.DB.batch([

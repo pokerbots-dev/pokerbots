@@ -15,7 +15,7 @@ def bot(body):
 def test_game_with_sandboxed_bots():
     result = run_game({"seed": 1, "bots": [
         bot("        return ('call',) if 'call' in state['legal'] else ('check',)\n"),
-        bot("        time.sleep(0.05)\n"),
+        bot("        end = time.process_time() + 0.03\n        while time.process_time() < end: pass\n"),
         bot("        1 / 0\n"),
         {"house": "caller"}, {"house": "raiser"}, {"house": "caller"},
     ]})

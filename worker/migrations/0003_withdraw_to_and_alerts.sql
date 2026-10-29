@@ -1,0 +1,6 @@
+ALTER TABLE deposits ADD COLUMN address TEXT;
+
+CREATE TABLE alerts (
+  key TEXT PRIMARY KEY,
+  sent_at INTEGER NOT NULL
+);

@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from pokerbots_cli.main import main
@@ -14,7 +16,7 @@ def test_init_then_test(tmp_path, capsys):
     bot = tmp_path / "mybot"
     assert main(["init", str(bot)]) == 0
     assert main(["test", str(bot), "--games", "3", "--seed", "1"]) == 0
-    assert "errors      0" in capsys.readouterr().out
+    assert re.search(r"errors\s+0\n", capsys.readouterr().out)
 
 
 def test_docs_plain(capsys):

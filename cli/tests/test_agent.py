@@ -13,6 +13,12 @@ class Fixed:
         return self.reply(state)
 
 
+def busy(seconds):
+    end = time.thread_time() + seconds
+    while time.thread_time() < end:
+        pass
+
+
 def run(reply):
     agent = Agent(Fixed(reply))
     return agent(dict(STATE)), agent
@@ -25,8 +31,12 @@ def test_legal_actions_pass_and_raises_clamp():
 
 
 def test_bad_bots_fold():
-    action, agent = run(lambda s: time.sleep(0.03))
+    action, agent = run(lambda s: time.sleep(0.15))
     assert action == ("fold",) and agent.late == 1
+    action, agent = run(lambda s: busy(0.03))
+    assert action == ("fold",) and agent.late == 1
+    action, agent = run(lambda s: time.sleep(0.03) or ("call",))
+    assert action == ("call",) and agent.late == 0
     action, agent = run(lambda s: 1 / 0)
     assert action == ("fold",) and "ZeroDivisionError" in agent.error
     action, agent = run(lambda s: ("check",))

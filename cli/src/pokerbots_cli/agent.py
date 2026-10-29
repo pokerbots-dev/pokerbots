@@ -1,7 +1,8 @@
 import traceback
-from time import perf_counter
+from time import perf_counter, thread_time
 
-LIMIT = 0.020
+LIMIT = 0.020  # CPU seconds per decision
+WALL = 0.100  # backstop so a bot cannot stall the table
 
 
 def fallback(state):
@@ -19,7 +20,10 @@ def normalize(action, state):
 
 
 class Agent:
-    """Runs an untrusted bot: enforces the time limit and returns only legal actions."""
+    """Runs an untrusted bot: enforces the CPU and wall limits and returns only legal actions.
+
+    CPU time comes from bot.cpu() when the bot runs elsewhere (a sandboxed process), else this thread.
+    """
 
     def __init__(self, bot, limit=LIMIT):
         self.bot = bot
@@ -30,14 +34,15 @@ class Agent:
 
     def __call__(self, state):
         self.decisions += 1
-        start = perf_counter()
+        clock = getattr(self.bot, "cpu", thread_time)
+        wall, cpu = perf_counter(), clock()
         try:
             action = self.bot.act(state)
         except Exception:
             return self.fail(state, traceback.format_exc())
-        elapsed = perf_counter() - start
-        self.slowest = max(self.slowest, elapsed)
-        if elapsed > self.limit:
+        wall, cpu = perf_counter() - wall, clock() - cpu
+        self.slowest = max(self.slowest, cpu)
+        if cpu > self.limit or wall > WALL:
             self.late += 1
             return fallback(state)
         return normalize(action, state) or self.fail(state, f"invalid action {action!r}, legal {state['legal']}")
