@@ -24,6 +24,9 @@ interface SeatRow {
   version: number | null;
   place: number;
   rating_delta: number | null;
+  late: number | null;
+  errors: number | null;
+  decisions: number | null;
 }
 
 interface Hand {
@@ -52,7 +55,7 @@ export async function history(req: Request, env: Env, user: User) {
   if (!games.length) return { games: [], next: null };
 
   const { results: seats } = await env.DB.prepare(
-    `SELECT s.game_id, s.seat, s.user_id, u.login, s.version, s.place, s.rating_delta
+    `SELECT s.game_id, s.seat, s.user_id, u.login, s.version, s.place, s.rating_delta, s.late, s.errors, s.decisions
      FROM seats s LEFT JOIN users u ON u.id = s.user_id
      WHERE s.game_id IN (${games.map(() => "?").join()}) ORDER BY s.seat`,
   ).bind(...games.map((g) => g.id)).all<SeatRow>();
@@ -69,7 +72,7 @@ export async function history(req: Request, env: Env, user: User) {
       players: table.map((s) => ({
         seat: s.seat,
         user: s.login ?? "house",
-        ...(s.user_id === user.id ? { version: s.version } : {}),
+        ...(s.user_id === user.id ? { version: s.version, decisions: s.decisions, late: s.late, errors: s.errors } : {}),
         place: s.place,
         rating_change: s.rating_delta === null ? null : Math.round(s.rating_delta * 10) / 10,
         won: g.mode === "live" ? ((PRIZES[s.place - 1] ?? 0) - BUY_IN) / 1e6 : null,

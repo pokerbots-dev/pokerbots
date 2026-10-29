@@ -6,7 +6,7 @@
     "dev": "wrangler dev --env staging",
     "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy --env production",
-    "test": "tsc --noEmit && vitest run"
+    "test": "tsc --noEmit && tsc -p ../site && vitest run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261023.1",

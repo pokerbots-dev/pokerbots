@@ -1,4 +1,6 @@
 import io
+import pydoc
+import shutil
 import sys
 import time
 import zipfile
@@ -6,11 +8,15 @@ from pathlib import Path
 
 from .. import auth
 from ..api import call
-from ..fmt import INK, PAPER, colored, held, money, place, signed, table, when
+from ..fmt import INK, PAPER, colored, held, money, place, signed, spark, table, when
 
 MAX_UPLOAD = 1 << 20
 WATCH_SECONDS = 5
 SEATS = 6
+RECENT = 10
+SCREEN_LINES_USED = 18
+BROKEN_AFTER_GAMES = 5
+BROKEN_RATE = 0.05
 ATTEST = "I am 18 or older, and paid skill competitions are allowed where I am. [y/N] "
 
 
@@ -61,9 +67,9 @@ def stop(args):
     print(f"stopped {mode}; games already queued will still play")
 
 
-def rank(mode):
-    board = call("GET", f"/leaderboard/{mode}")
-    return f"#{board['you']} of {board['ranked']}" if board["you"] else f"unranked until {board['min_games']} games"
+def rank(me, mode):
+    st = me["stats"].get(mode)
+    return f"#{st['rank']} of {st['ranked']}" if st and st["rank"] else "unranked until 20 games"
 
 
 def note(me, mode):
@@ -77,24 +83,43 @@ def note(me, mode):
     return ""
 
 
-def report():
+def quality(d):
+    """Late and error rates for the deployed version; flags a version that looks broken."""
+    if not d.get("decisions"):
+        return ""
+    late, errors = d["late"] / d["decisions"], d["errors"] / d["decisions"]
+    text = f"late {late:.1%}  errors {errors:.1%}"
+    if d["version_games"] >= BROKEN_AFTER_GAMES and late + errors > BROKEN_RATE:
+        text += f"  v{d['version']} looks broken: pb games"
+    return text
+
+
+def game_rows(games):
+    live = any(g["mode"] == "live" for g in games)
+    head = ["game", "mode", "place", "hands", "rating", "late", "errors"] + (["won"] if live else [])
+    return table([head] + [
+        [when(g["created_at"]), g["mode"], place(g["place"]), g["hands"] or "-", signed(g.get("rating_delta")),
+         g.get("late") if g.get("late") is not None else "-", g.get("errors") if g.get("errors") is not None else "-"]
+        + ([signed(g.get("net"), "money")] if live else [])
+        for g in games
+    ], header=True)
+
+
+def report(limit=RECENT):
     me = call("GET", "/me")
-    rows = [["user", me["login"]], ["versions", " ".join(f"v{v}" for v in me["versions"]) or "-"]]
+    rows = [["user", me["login"]], ["profile", f"pokerbots.dev/{me['login']}"], ["versions", " ".join(f"v{v}" for v in me["versions"]) or "-"]]
     for mode in ("paper", "live"):
         d = me["deployments"].get(mode)
-        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}  {rank(mode)}{note(me, mode)}" if d else "-"])
+        if not d:
+            rows.append([mode, "-"])
+            continue
+        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}  {rank(me, mode)}{note(me, mode)}"])
+        st = me["stats"].get(mode)
+        rows += [["", line] for line in (spark(st["curve"]) if st else "", quality(d)) if line]
     rows += [["balance", f"{money(me['balance'])} on pokerbots, for live buy-ins"], ["wallet", held(me)]]
     text = table(rows, labels=True)
-    games = call("GET", "/games")
-    if games:
-        live = any(g["mode"] == "live" for g in games)
-        head = ["game", "mode", "place", "hands", "rating"] + (["won"] if live else [])
-        text += "\n\n" + table([head] + [
-            [when(g["created_at"]), g["mode"], place(g["place"]), g["hands"] or "-", signed(g.get("rating_delta"))]
-            + ([signed(g.get("net"), "money")] if live else [])
-            for g in games
-        ], header=True)
-    return text
+    games = call("GET", f"/games?limit={limit}")
+    return text + ("\n\n" + game_rows(games) if games else "")
 
 
 def leaderboard(mode):
@@ -131,7 +156,17 @@ def status(args):
 
 
 def watch(args):
-    screen(report)
+    screen(lambda: report(max(RECENT, shutil.get_terminal_size().lines - SCREEN_LINES_USED)))
+
+
+def games(args):
+    mode = "&mode=live" if args.live else "&mode=paper" if args.paper else ""
+    rows = call("GET", f"/games?limit={args.n}{mode}")
+    text = game_rows(rows) if rows else "no games yet"
+    if sys.stdout.isatty():
+        pydoc.pager(text)
+    else:
+        print(text)
 
 
 def top(args):
@@ -159,3 +194,10 @@ def register(sub):
         p.set_defaults(run=run)
 
     sub.add_parser("status", help="your bot, rating, balance and recent games").set_defaults(run=status)
+
+    p = sub.add_parser("games", help="your past games, scrollable")
+    p.add_argument("-n", type=int, default=100, help="how many, default 100")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--paper", action="store_true")
+    mode.add_argument("--live", action="store_true")
+    p.set_defaults(run=games)

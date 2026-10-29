@@ -35,7 +35,7 @@ def run_game(spec):
         "places": result.places,
         "hands": result.hands,
         "history": result.history,
-        "stats": [{"late": a.late, "errors": a.errors, "slowest_ms": round(a.slowest * 1000, 2)} for a in agents],
+        "stats": [{"decisions": a.decisions, "late": a.late, "errors": a.errors, "slowest_ms": round(a.slowest * 1000, 2)} for a in agents],
     }
 
 

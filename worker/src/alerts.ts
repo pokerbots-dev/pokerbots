@@ -38,7 +38,7 @@ export async function checkAlerts(env: Env) {
   }
 }
 
-async function send(env: Env, subject: string, text: string) {
+export async function send(env: Env, subject: string, text: string) {
   console.error("alert", subject, text);
   if (!env.EMAIL || !env.ALERT_EMAIL) return;
   const raw = [
