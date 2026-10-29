@@ -4,6 +4,7 @@ import { chain, hotBalances } from "./solana";
 
 const LOW_SOL = 0.01;
 const FAILED_GAMES_PER_HOUR = 5;
+const BACKLOG_GAMES = 20;
 const REPEAT_SECONDS = 6 * 3600;
 const FROM = "alerts@pokerbots.dev";
 
@@ -11,11 +12,12 @@ const usd = (micro: number) => `$${(micro / 1e6).toFixed(2)}`;
 
 async function problems(env: Env): Promise<[string, string][]> {
   const one = (sql: string) => env.DB.prepare(sql).first<number>("n").then((n) => n ?? 0);
-  const [owed, pending, failedGames, failedWithdrawals, hot] = await Promise.all([
+  const [owed, pending, failedGames, failedWithdrawals, backlog, hot] = await Promise.all([
     one("SELECT COALESCE(SUM(amount), 0) AS n FROM ledger WHERE user_id IS NOT NULL"),
     one("SELECT COUNT(*) AS n FROM withdrawals WHERE status = 'pending'"),
     one("SELECT COUNT(*) AS n FROM games WHERE status = 'failed' AND created_at >= datetime('now', '-1 hour')"),
     one("SELECT COUNT(*) AS n FROM withdrawals WHERE status = 'failed' AND created_at >= datetime('now', '-1 day')"),
+    one("SELECT COUNT(*) AS n FROM games WHERE status = 'queued' AND created_at < datetime('now', '-5 minutes')"),
     chain(env).then(hotBalances),
   ]);
   const found: [string, string][] = [];
@@ -24,6 +26,7 @@ async function problems(env: Env): Promise<[string, string][]> {
   if (pending) found.push(["pending-withdrawals", `${pending} withdrawal(s) over the daily caps wait for: pb admin withdrawals`]);
   if (failedGames >= FAILED_GAMES_PER_HOUR) found.push(["failed-games", `${failedGames} games failed in the last hour; check the runner logs.`]);
   if (failedWithdrawals) found.push(["failed-withdrawals", `${failedWithdrawals} withdrawal(s) failed on-chain in the last day and were refunded.`]);
+  if (backlog >= BACKLOG_GAMES) found.push(["backlog", `${backlog} games have waited over 5 minutes to run; the runner is falling behind.`]);
   return found;
 }
 

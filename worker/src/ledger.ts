@@ -2,7 +2,7 @@
 // (kind, ref), so every write is idempotent and safe to retry.
 import type { Env } from "./env";
 
-export type Kind = "deposit" | "buyin" | "payout" | "rake" | "refund" | "withdrawal";
+export type Kind = "deposit" | "buyin" | "payout" | "rake" | "refund" | "withdrawal" | "adjustment";
 
 export const balanceOf = (column: string) => `(SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE user_id = ${column})`;
 

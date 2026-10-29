@@ -6,6 +6,7 @@ export interface User {
   login: string;
   wallet: string | null;
   attested_at: string | null;
+  suspended_at: string | null;
 }
 
 const SESSION_SECONDS = 3600;

@@ -1,4 +1,5 @@
 import { send } from "./alerts";
+import { SWITCHES, paused, setPaused, type Switch } from "./ops";
 import type { Env } from "./env";
 import { HttpError, body, type Routes } from "./http";
 import { refundWithdrawal, sendWithdrawal } from "./payments";
@@ -19,7 +20,37 @@ export const adminRoutes: Routes<Ctx> = {
       one("SELECT COALESCE(SUM(amount), 0) AS n FROM withdrawals WHERE status IN ('approved', 'sent', 'done') AND created_at >= date('now')"),
       chain(env).then(hotBalances),
     ]);
-    return { users, games_today: games, liabilities, withdrawn_today: withdrawn, hot_usdc: hot.usdc, hot_sol: hot.sol };
+    return { users, games_today: games, liabilities, withdrawn_today: withdrawn, hot_usdc: hot.usdc, hot_sol: hot.sol, paused: await paused(env) };
+  },
+
+  async "POST /admin/pause/:what"({ env }, [what]) {
+    return toggle(env, what, true);
+  },
+
+  async "POST /admin/resume/:what"({ env }, [what]) {
+    return toggle(env, what, false);
+  },
+
+  async "POST /admin/users/:login/suspend"({ env }, [login]) {
+    await setSuspended(env, login, true);
+    return { suspended: true };
+  },
+
+  async "POST /admin/users/:login/unsuspend"({ env }, [login]) {
+    await setSuspended(env, login, false);
+    return { suspended: false };
+  },
+
+  // Manual credit (+) or debit (-) with a reason, recorded in the ledger like any other movement.
+  async "POST /admin/users/:login/adjust"({ req, env }, [login]) {
+    const { amount, reason } = await body<{ amount: unknown; reason: unknown }>(req);
+    if (!Number.isSafeInteger(amount) || amount === 0 || typeof reason !== "string" || !reason.trim()) {
+      throw new HttpError(400, "amount (non-zero micro-USDC) and reason are required");
+    }
+    const id = await userId(env, login);
+    await env.DB.prepare("INSERT INTO ledger (user_id, kind, amount, ref, note) VALUES (?, 'adjustment', ?, ?, ?)")
+      .bind(id, amount, `adj:${crypto.randomUUID()}`, reason.trim()).run();
+    return { balance: await env.DB.prepare("SELECT COALESCE(SUM(amount), 0) AS b FROM ledger WHERE user_id = ?").bind(id).first<number>("b") };
   },
 
   async "POST /admin/test-alert"({ env }) {
@@ -47,3 +78,21 @@ export const adminRoutes: Routes<Ctx> = {
     return { status: await env.DB.prepare("SELECT status FROM withdrawals WHERE id = ?").bind(id).first<string>("status") };
   },
 };
+
+async function toggle(env: Env, what: string, on: boolean) {
+  const targets = what === "all" ? [...SWITCHES] : [what];
+  if (!targets.every((w) => (SWITCHES as readonly string[]).includes(w))) throw new HttpError(400, "live, deposits, withdrawals or all");
+  for (const w of targets) await setPaused(env, w as Switch, on);
+  return { paused: await paused(env) };
+}
+
+async function userId(env: Env, login: string) {
+  const id = await env.DB.prepare("SELECT id FROM users WHERE login = ? COLLATE NOCASE").bind(login).first<number>("id");
+  if (!id) throw new HttpError(404, "no such user");
+  return id;
+}
+
+async function setSuspended(env: Env, login: string, on: boolean) {
+  const id = await userId(env, login);
+  await env.DB.prepare(`UPDATE users SET suspended_at = ${on ? "CURRENT_TIMESTAMP" : "NULL"} WHERE id = ?`).bind(id).run();
+}

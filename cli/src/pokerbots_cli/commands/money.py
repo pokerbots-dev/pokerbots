@@ -1,8 +1,9 @@
+import pydoc
 import sys
 
 from .. import wallet as keys
 from ..api import call
-from ..fmt import held, money, parse_money, table
+from ..fmt import held, money, parse_money, signed, table, when
 
 
 def registered_key():
@@ -40,9 +41,31 @@ def withdraw(args):
     print(f"withdrawal {reply['status']}: {money(reply['amount'])}")
 
 
+KINDS = {"deposit": "deposit", "withdrawal": "withdrawal", "buyin": "buy-in", "payout": "prize",
+         "refund": "refund", "adjustment": "adjustment"}
+
+
+def ledger(args):
+    reply = call("GET", f"/ledger?limit={args.n}")
+    balance, rows = reply["balance"], []
+    cluster = "" if reply.get("cluster", "mainnet-beta") == "mainnet-beta" else f"?cluster={reply['cluster']}"
+    for e in reply["entries"]:
+        detail = e.get("note") or (f"solscan.io/tx/{e['tx']}{cluster}" if e.get("tx") else "")
+        rows.append([when(e["created_at"]), KINDS.get(e["kind"], e["kind"]), signed(e["amount"], "money"), money(balance), detail])
+        balance -= e["amount"]
+    text = table([["time", "what", "amount", "balance", ""]] + rows, header=True) if rows else "no money movements yet"
+    if sys.stdout.isatty():
+        pydoc.pager(text)
+    else:
+        print(text)
+
+
 def register(sub):
     sub.add_parser("wallet", help="your Solana wallet address and balance").set_defaults(run=wallet)
     for name, run in (("deposit", deposit), ("withdraw", withdraw)):
         p = sub.add_parser(name, help=f"{name} USDC, e.g. pb {name} 5")
         p.add_argument("amount", help="dollars")
         p.set_defaults(run=run)
+    p = sub.add_parser("ledger", help="every deposit, withdrawal, buy-in and prize")
+    p.add_argument("-n", type=int, default=100, help="how many, default 100")
+    p.set_defaults(run=ledger)

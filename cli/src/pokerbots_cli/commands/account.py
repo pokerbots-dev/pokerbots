@@ -94,6 +94,8 @@ def note(me, mode):
     """Why live games might not be starting."""
     if mode != "live":
         return ""
+    if "live" in me.get("paused", []):
+        return "  paused for maintenance"
     if me["balance"] < me["buy_in"]:
         return f"  paused: balance below {money(me['buy_in'])}"
     if me["live_ready"] < SEATS:
@@ -125,7 +127,7 @@ def game_rows(games):
 
 def report(limit=RECENT):
     me = call("GET", "/me")
-    rows = [["user", me["login"]], ["profile", f"pokerbots.dev/{me['login']}"], ["versions", " ".join(f"v{v}" for v in me["versions"]) or "-"]]
+    rows = [["user", me["login"] + ("  suspended: you can still withdraw; hello@pokerbots.dev" if me.get("suspended") else "")], ["profile", f"pokerbots.dev/{me['login']}"], ["versions", " ".join(f"v{v}" for v in me["versions"]) or "-"]]
     for mode in ("paper", "live"):
         d = me["deployments"].get(mode)
         if not d:

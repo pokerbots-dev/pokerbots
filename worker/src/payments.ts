@@ -9,6 +9,7 @@ import type { User } from "./auth";
 import { BUY_IN, dollars, type Env } from "./env";
 import { HttpError, amount as checkAmount } from "./http";
 import { credit } from "./ledger";
+import { paused, requireActive, requireRunning } from "./ops";
 import { chain, send, signatureOf, status, transfer, type Chain } from "./solana";
 
 interface Deposit {
@@ -33,6 +34,8 @@ function wallet(user: User) {
 }
 
 export async function prepareDeposit(env: Env, user: User, value: unknown) {
+  requireActive(user);
+  await requireRunning(env, "deposits");
   const amount = checkAmount(value, BUY_IN);
   const c = await chain(env);
   const tx = await transfer(c, wallet(user), c.hot.address, amount);
@@ -42,6 +45,7 @@ export async function prepareDeposit(env: Env, user: User, value: unknown) {
 }
 
 export async function submitDeposit(env: Env, user: User, signature: string, wire: string) {
+  await requireRunning(env, "deposits");
   if (signatureOf(wire) !== signature) throw new HttpError(400, "transaction does not match");
   const deposit = await env.DB.prepare(
     "UPDATE deposits SET status = 'sent' WHERE signature = ? AND user_id = ? AND status = 'prepared' RETURNING *",
@@ -87,6 +91,7 @@ export async function withdrawalAddress(env: Env, userId: number) {
 }
 
 export async function requestWithdrawal(env: Env, user: User, value: unknown) {
+  await requireRunning(env, "withdrawals");
   const amount = checkAmount(value, BUY_IN);
   const to = await withdrawalAddress(env, user.id);
   if (!to) throw new HttpError(400, "deposit first: withdrawals go to the wallet you deposited from");
@@ -110,6 +115,7 @@ export async function requestWithdrawal(env: Env, user: User, value: unknown) {
 export async function sendWithdrawal(env: Env, id: string, c?: Chain) {
   const w = await env.DB.prepare("SELECT * FROM withdrawals WHERE id = ?").bind(id).first<Withdrawal>();
   if (!w || w.status !== "approved") return w?.status;
+  if ((await paused(env)).includes("withdrawals")) return "approved"; // sent by the minute job after resume
   c ??= await chain(env);
   const tx = await transfer(c, c.hot.address, address(w.address), w.amount);
   const claimed = await env.DB.prepare(
