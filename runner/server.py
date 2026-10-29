@@ -9,10 +9,16 @@ from socketserver import TCPServer
 from pokerbots_cli import engine
 from pokerbots_cli.agent import Agent
 from pokerbots_cli.house import HOUSE as STYLES
-from sandbox import ProcessBot
+from pokerbots_cli.sandbox import ProcessBot, unpack
 
 HOUSE = {**STYLES, "caller": STYLES["loose"], "raiser": STYLES["solid"]}  # old names for games queued before the change
 FIRST_UID = 10000
+
+
+def sandboxed(code, directory, uid):
+    directory.mkdir()
+    unpack(code, directory, uid)
+    return ProcessBot(directory, uid)
 
 
 def run_game(spec):
@@ -21,7 +27,7 @@ def run_game(spec):
         Path(root).chmod(0o711)
         bots = [
             HOUSE[b["house"]]() if "house" in b
-            else ProcessBot(base64.b64decode(b["code"]), Path(root) / str(i), FIRST_UID + i)
+            else sandboxed(base64.b64decode(b["code"]), Path(root) / str(i), FIRST_UID + i)
             for i, b in enumerate(spec["bots"])
         ]
         agents = [Agent(b) for b in bots]

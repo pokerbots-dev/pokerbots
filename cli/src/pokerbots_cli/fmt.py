@@ -4,8 +4,6 @@ from datetime import datetime, timezone
 
 MICRO = 1_000_000
 INK, PAPER = "17;17;17", "244;243;239"
-BLOCKS = "▁▂▃▄▅▆▇█"
-SPARK_WIDTH = 60
 
 
 def colored():
@@ -45,17 +43,6 @@ def held(me):
     if not me["wallet_usdc"] and me.get("wallet_sol"):
         text += f" ({me['wallet_sol']} SOL there; deposits need USDC)"
     return text
-
-
-def spark(all_points, width=SPARK_WIDTH):
-    """Rating curve as one line of block characters; long histories are averaged into width buckets."""
-    if len(all_points) < 2:
-        return ""
-    n = min(width, len(all_points))
-    parts = [all_points[i * len(all_points) // n:(i + 1) * len(all_points) // n] for i in range(n)]
-    points = [sum(p) / len(p) for p in parts]
-    low, span = min(points), (max(points) - min(points)) or 1
-    return "".join(BLOCKS[round((p - low) / span * (len(BLOCKS) - 1))] for p in points)
 
 
 def signed(value, unit=""):

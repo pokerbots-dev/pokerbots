@@ -4,7 +4,6 @@ import { HttpError, type Routes } from "./http";
 
 export const BOARD_SIZE = 20;
 export const BOARD_MIN_GAMES = 20;
-const CURVE_GAMES = 200;
 const MODES = ["paper", "live"] as const;
 
 export interface BoardRow {
@@ -29,23 +28,11 @@ export async function board(env: Env, mode: string) {
 
 const publicRow = ({ user_id, ...row }: BoardRow) => row;
 
-// Ratings after each of the last CURVE_GAMES games, oldest first, rebuilt from per-game changes.
-async function curve(env: Env, userId: number, mode: string, rating: number) {
-  const { results } = await env.DB.prepare(
-    `SELECT s.rating_delta AS d FROM seats s JOIN games g ON g.id = s.game_id
-     WHERE s.user_id = ? AND g.mode = ? AND g.status = 'done' AND s.rating_delta IS NOT NULL
-     ORDER BY g.finished_at DESC LIMIT ?`,
-  ).bind(userId, mode, CURVE_GAMES).all<{ d: number }>();
-  const points = [rating];
-  for (const { d } of results) points.push(points[points.length - 1] - d);
-  return points.reverse().map(Math.round);
-}
-
 export async function stats(env: Env, userId: number) {
   const out: Record<string, unknown> = {};
   for (const mode of MODES) {
-    const r = await env.DB.prepare("SELECT rating, games FROM ratings WHERE user_id = ? AND mode = ?").bind(userId, mode)
-      .first<{ rating: number; games: number }>();
+    const r = await env.DB.prepare("SELECT rating, games, COALESCE(best, rating) AS best FROM ratings WHERE user_id = ? AND mode = ?")
+      .bind(userId, mode).first<{ rating: number; games: number; best: number }>();
     if (!r) {
       out[mode] = null;
       continue;
@@ -58,7 +45,7 @@ export async function stats(env: Env, userId: number) {
       rank: rank || null,
       ranked: rows.length,
       won: rank ? rows[rank - 1].won : null,
-      curve: await curve(env, userId, mode, r.rating),
+      best: Math.round(Math.max(r.best, r.rating)),
     };
   }
   return out;

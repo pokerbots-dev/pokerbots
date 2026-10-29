@@ -40,7 +40,7 @@ def suspend(args):
 
 
 def adjust(args):
-    reply = admin("POST", f"/users/{args.login}/adjust", {"amount": round(float(args.dollars) * MICRO), "reason": " ".join(args.reason)})
+    reply = admin("POST", f"/users/{args.login}/adjust", {"amount": round(float(args.dollars) * MICRO), "reason": " ".join(args.reason), "force": args.force})
     print(f"{args.login} balance {money(reply['balance'])}")
 
 
@@ -61,6 +61,7 @@ def register(sub):
     q = admin_sub.add_parser("adjust", help="credit (+) or debit (-) a balance, e.g. adjust alice -0.10 duplicate payout")
     q.add_argument("login")
     q.add_argument("dollars")
+    q.add_argument("--force", action="store_true", help="allow a negative balance")
     q.add_argument("reason", nargs="+")
     q.set_defaults(run=adjust)
     for action in ("approve", "reject"):

@@ -8,9 +8,9 @@ from pathlib import Path
 
 from .. import auth
 from ..api import ApiError, call
-from ..fmt import INK, PAPER, colored, held, money, place, signed, spark, table, when
+from ..fmt import INK, PAPER, colored, held, money, place, signed, table, when
 
-MAX_UPLOAD = 1 << 20
+MAX_UPLOAD = 5_000_000
 WATCH_SECONDS = 5
 SEATS = 6
 RECENT = 10
@@ -42,7 +42,7 @@ def logout(args):
 
 def whoami(args):
     current = auth.load()
-    print(f"{current['user']}  github.com/{current['user']}" if current else "not logged in: pb login")
+    print(f"{current['user']}  github.com/{current['user']}  pokerbots.dev/{current['user']}" if current else "not logged in: pb login")
 
 
 def bundle(directory):
@@ -56,7 +56,7 @@ def bundle(directory):
             if path.is_file() and not any(p.startswith(".") or p == "__pycache__" for p in relative.parts):
                 z.write(path, relative.as_posix())
     if buffer.tell() > MAX_UPLOAD:
-        sys.exit("bot is over 1 MB zipped")
+        sys.exit(f"bot is over {MAX_UPLOAD // 1_000_000} MB zipped")
     return buffer.getvalue()
 
 
@@ -133,9 +133,12 @@ def report(limit=RECENT):
         if not d:
             rows.append([mode, "-"])
             continue
-        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}  {rank(me, mode)}{note(me, mode)}"])
+        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  {rank(me, mode)}{note(me, mode)}"])
         st = me["stats"].get(mode)
-        rows += [["", line] for line in (spark(st["curve"]) if st else "", quality(d)) if line]
+        today = f"today {signed(d['rating_today'])} over {d['today']} games" + (f"   best {st['best']}" if st else "")
+        if mode == "live":
+            today += f"   won today {signed(d['won_today'], 'money')}" + (f", all time {signed(st['won'], 'money')}" if st and st["won"] is not None else "")
+        rows += [["", line] for line in (today, quality(d)) if line]
     rows += [["balance", f"{money(me['balance'])} on pokerbots, for live buy-ins"], ["wallet", held(me)]]
     text = table(rows, labels=True)
     games = call("GET", f"/games?limit={limit}")

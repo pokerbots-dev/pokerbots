@@ -43,13 +43,17 @@ export const adminRoutes: Routes<Ctx> = {
 
   // Manual credit (+) or debit (-) with a reason, recorded in the ledger like any other movement.
   async "POST /admin/users/:login/adjust"({ req, env }, [login]) {
-    const { amount, reason } = await body<{ amount: unknown; reason: unknown }>(req);
+    const { amount, reason, force } = await body<{ amount: unknown; reason: unknown; force?: boolean }>(req);
     if (!Number.isSafeInteger(amount) || amount === 0 || typeof reason !== "string" || !reason.trim()) {
       throw new HttpError(400, "amount (non-zero micro-USDC) and reason are required");
     }
     const id = await userId(env, login);
-    await env.DB.prepare("INSERT INTO ledger (user_id, kind, amount, ref, note) VALUES (?, 'adjustment', ?, ?, ?)")
-      .bind(id, amount, `adj:${crypto.randomUUID()}`, reason.trim()).run();
+    // A debit may not take a balance below zero unless forced (e.g. clawing back a payout made in error).
+    const { meta } = await env.DB.prepare(
+      `INSERT INTO ledger (user_id, kind, amount, ref, note)
+       SELECT ?1, 'adjustment', ?2, ?3, ?4 WHERE ?5 OR ?2 > 0 OR (SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE user_id = ?1) + ?2 >= 0`,
+    ).bind(id, amount, `adj:${crypto.randomUUID()}`, reason.trim(), force ? 1 : 0).run();
+    if (!meta.changes) throw new HttpError(400, "that would make the balance negative; add --force if intended");
     return { balance: await env.DB.prepare("SELECT COALESCE(SUM(amount), 0) AS b FROM ledger WHERE user_id = ?").bind(id).first<number>("b") };
   },
 

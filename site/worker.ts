@@ -10,7 +10,7 @@ interface Mode {
   rank: number | null;
   ranked: number;
   won: number | null;
-  curve: number[];
+  best: number;
 }
 
 interface Row {
@@ -22,7 +22,6 @@ interface Row {
 
 const SITE = "https://pokerbots.dev";
 const CACHE_SECONDS = 60;
-const BLOCKS = "▁▂▃▄▅▆▇█";
 const INSTALL = "$ curl -fsSL https://pokerbots.dev/install | sh";
 
 const STYLE = `:root{--paper:#F4F3EF;--ink:#111111}*{box-sizing:border-box}html,body{margin:0;background:var(--paper);color:var(--ink)}
@@ -39,20 +38,6 @@ function money(micro: number) {
   const cents = Math.round(micro / 10_000);
   const sign = cents > 0 ? "+" : cents < 0 ? "-" : "";
   return Math.abs(cents) < 100 ? `${sign}${Math.abs(cents)}¢` : `${sign}$${(Math.abs(cents) / 100).toFixed(2)}`;
-}
-
-const SPARK_WIDTH = 60;
-
-// One line of block characters; long histories are averaged into SPARK_WIDTH buckets.
-function spark(all: number[]) {
-  if (all.length < 2) return "";
-  const n = Math.min(SPARK_WIDTH, all.length);
-  const points = Array.from({ length: n }, (_, i) => {
-    const part = all.slice(Math.floor((i * all.length) / n), Math.floor(((i + 1) * all.length) / n));
-    return part.reduce((a, b) => a + b, 0) / part.length;
-  });
-  const low = Math.min(...points), span = Math.max(...points) - low || 1;
-  return points.map((p) => BLOCKS[Math.round(((p - low) / span) * (BLOCKS.length - 1))]).join("");
 }
 
 const section = (label: string, body: string, cls = "") => `<section><p class="label">${label}</p><pre${cls}>${body}</pre></section>`;
@@ -76,7 +61,7 @@ function profile(p: { login: string; min_games: number; paper: Mode | null; live
   const modes = (["paper", "live"] as const).filter((k) => p[k]).map((k) => {
     const m = p[k]!;
     const won = k === "live" && m.won !== null ? `   won ${money(m.won)}` : "";
-    return section(k, `${rankText(m, p.min_games)}   rating ${m.rating}   games ${m.games}${won}\n${spark(m.curve)}`);
+    return section(k, `${rankText(m, p.min_games)}   rating ${m.rating}   best ${m.best}   games ${m.games}${won}`);
   });
   const post = `https://x.com/intent/post?text=${encodeURIComponent(`My poker bot on pokerbots.dev: ${summary}`)}&url=${encodeURIComponent(url)}`;
   const login = esc(p.login);

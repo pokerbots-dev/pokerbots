@@ -141,8 +141,10 @@ async function record(env: Env, game: Game, seats: Seat[], outcome: Outcome) {
     ];
     if (user_id) {
       out.push(
-        env.DB.prepare(`UPDATE ratings SET rating = rating + ?, games = games + 1 WHERE user_id = ? AND mode = ? AND ${queued}`)
-          .bind(deltas[i], user_id, game.mode, game.id),
+        env.DB.prepare(
+          `UPDATE ratings SET rating = rating + ?1, games = games + 1, best = MAX(COALESCE(best, rating), rating + ?1)
+           WHERE user_id = ?2 AND mode = ?3 AND ${queued}`,
+        ).bind(deltas[i], user_id, game.mode, game.id),
       );
       if (game.mode === "live" && i < PRIZES.length) out.push(credit(env, user_id, "payout", PRIZES[i], `${game.id}:${seat}`));
     }
