@@ -2,6 +2,7 @@ import importlib.util
 import pydoc
 import random
 import shutil
+import subprocess
 import sys
 from importlib import resources
 from pathlib import Path
@@ -67,6 +68,17 @@ def test(args):
         return 1
 
 
+def upgrade(args):
+    """Upgrade with whichever installer pb came from; --refresh skips uv's stale package index."""
+    if shutil.which("uv"):
+        command = ["uv", "tool", "upgrade", "--refresh", "pokerbots-dev"]
+    elif shutil.which("pipx"):
+        command = ["pipx", "upgrade", "pokerbots-dev"]
+    else:
+        command = [sys.executable, "-m", "pip", "install", "--upgrade", "pokerbots-dev"]
+    return subprocess.call(command)
+
+
 def register(sub):
     p = sub.add_parser("docs", help="show the docs")
     p.add_argument("--plain", action="store_true", help="no pager, for agents")
@@ -81,3 +93,5 @@ def register(sub):
     p.add_argument("--games", type=int, default=100)
     p.add_argument("--seed", type=int)
     p.set_defaults(run=test)
+
+    sub.add_parser("upgrade", help="upgrade pb to the latest version").set_defaults(run=upgrade)

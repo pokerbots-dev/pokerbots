@@ -8,10 +8,10 @@ from socketserver import TCPServer
 
 from pokerbots_cli import engine
 from pokerbots_cli.agent import Agent
-from pokerbots_cli.house import Caller, Raiser
+from pokerbots_cli.house import HOUSE as STYLES
 from sandbox import ProcessBot
 
-HOUSE = {"caller": Caller, "raiser": Raiser}
+HOUSE = {**STYLES, "caller": STYLES["loose"], "raiser": STYLES["solid"]}  # old names for games queued before the change
 FIRST_UID = 10000
 
 

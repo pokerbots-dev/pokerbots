@@ -17,7 +17,7 @@ def test_game_with_sandboxed_bots():
         bot("        return ('call',) if 'call' in state['legal'] else ('check',)\n"),
         bot("        end = time.process_time() + 0.03\n        while time.process_time() < end: pass\n"),
         bot("        1 / 0\n"),
-        {"house": "caller"}, {"house": "raiser"}, {"house": "caller"},
+        {"house": "tight"}, {"house": "loose"}, {"house": "solid"},
     ]})
     assert sorted(result["places"]) == list(range(6))
     fast, slow, broken = result["stats"][:3]

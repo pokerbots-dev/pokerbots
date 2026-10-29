@@ -2,7 +2,7 @@ import { EmailMessage } from "cloudflare:email";
 import type { Env } from "./env";
 import { chain, hotBalances } from "./solana";
 
-const LOW_SOL = 0.05;
+const LOW_SOL = 0.01;
 const FAILED_GAMES_PER_HOUR = 5;
 const REPEAT_SECONDS = 6 * 3600;
 const FROM = "alerts@pokerbots.dev";

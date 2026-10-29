@@ -1,11 +1,12 @@
 import type { User } from "./auth";
-import { MAX_BOT_BYTES, type Env } from "./env";
+import { ATTEST_VERSION, BUY_IN, MAX_BOT_BYTES, type Env } from "./env";
 import { history } from "./history";
 import { HttpError, body, type Routes } from "./http";
-import { balance } from "./ledger";
+import { balance, balanceOf } from "./ledger";
 import { botKey } from "./match";
 import { prepareDeposit, requestWithdrawal, submitDeposit, withdrawalAddress } from "./payments";
-import { isAddress } from "./solana";
+import { address } from "@solana/kit";
+import { balances, chain, isAddress } from "./solana";
 
 interface Ctx {
   req: Request;
@@ -18,6 +19,9 @@ const RECENT_GAMES = 10;
 const BOARD_SIZE = 20;
 const BOARD_MIN_GAMES = 20;
 
+const attested = (env: Env, userId: number) =>
+  env.DB.prepare("SELECT 1 FROM attestations WHERE user_id = ? AND version = ?").bind(userId, ATTEST_VERSION).first().then(Boolean);
+
 function mode(value: unknown) {
   if (value !== "paper" && value !== "live") throw new HttpError(400, "mode is paper or live");
   return value;
@@ -25,7 +29,7 @@ function mode(value: unknown) {
 
 export const userRoutes: Routes<Ctx> = {
   async "GET /me"({ env, user }) {
-    const [versions, deployments, funds, withdrawTo] = await Promise.all([
+    const [versions, deployments, funds, withdrawTo, held, agreed, liveReady] = await Promise.all([
       env.DB.prepare("SELECT version FROM versions WHERE user_id = ? ORDER BY version").bind(user.id).all<{ version: number }>(),
       env.DB.prepare(
         `SELECT d.mode, d.version, r.rating, r.games,
@@ -35,13 +39,21 @@ export const userRoutes: Routes<Ctx> = {
       ).bind(user.id).all<{ mode: string }>(),
       balance(env, user.id),
       withdrawalAddress(env, user.id),
+      user.wallet ? chain(env).then((c) => balances(c, address(user.wallet!))).catch(() => null) : null,
+      attested(env, user.id),
+      env.DB.prepare(`SELECT COUNT(*) AS n FROM deployments d WHERE d.mode = 'live' AND ${balanceOf("d.user_id")} >= ?`)
+        .bind(BUY_IN).first<number>("n"),
     ]);
     return {
       login: user.login,
       wallet: user.wallet,
       withdraw_to: withdrawTo,
-      attested: Boolean(user.attested_at),
+      attested: agreed,
+      live_ready: liveReady,
+      buy_in: BUY_IN,
       balance: funds,
+      wallet_usdc: held?.usdc ?? null,
+      wallet_sol: held?.sol ?? null,
       versions: versions.results.map((v) => v.version),
       deployments: Object.fromEntries(deployments.results.map((d) => [d.mode, d])),
     };
@@ -66,7 +78,7 @@ export const userRoutes: Routes<Ctx> = {
   async "POST /deployments"({ req, env, user }) {
     const input = await body<{ mode: unknown; version: unknown }>(req);
     const m = mode(input.mode);
-    if (m === "live" && !user.attested_at) throw new HttpError(403, "live play needs the 18+ and location confirmation");
+    if (m === "live" && !(await attested(env, user.id))) throw new HttpError(403, "live play needs the 18+ and location confirmation");
     const exists = await env.DB.prepare("SELECT 1 FROM versions WHERE user_id = ? AND version = ?").bind(user.id, input.version).first();
     if (!exists) throw new HttpError(404, `no version v${input.version}`);
     await env.DB.batch([
@@ -82,8 +94,13 @@ export const userRoutes: Routes<Ctx> = {
     return { mode: m };
   },
 
-  async "POST /attest"({ env, user }) {
-    await env.DB.prepare("UPDATE users SET attested_at = CURRENT_TIMESTAMP WHERE id = ? AND attested_at IS NULL").bind(user.id).run();
+  async "POST /attest"({ req, env, user }) {
+    const cf = req.cf as { country?: string; region?: string } | undefined;
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO attestations (user_id, version, ip, country, region) VALUES (?, ?, ?, ?, ?)")
+        .bind(user.id, ATTEST_VERSION, req.headers.get("cf-connecting-ip"), cf?.country ?? null, cf?.region ?? null),
+      env.DB.prepare("UPDATE users SET attested_at = CURRENT_TIMESTAMP WHERE id = ?").bind(user.id),
+    ]);
     return { attested: true };
   },
 

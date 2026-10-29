@@ -33,7 +33,7 @@ interface Outcome {
   stats: { late: number; errors: number }[];
 }
 
-const HOUSE = ["caller", "raiser"];
+const HOUSE = ["tight", "loose", "solid"];
 const INITIAL_RATING = 1500;
 
 export const botKey = (userId: number, version: number) => `bots/${userId}/v${version}.zip`;
