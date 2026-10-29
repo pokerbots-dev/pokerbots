@@ -2,7 +2,7 @@
 set -eu
 
 if command -v uv >/dev/null 2>&1; then
-  uv tool install --upgrade pokerbots-dev
+  uv tool install --refresh pokerbots-dev@latest
 elif command -v pipx >/dev/null 2>&1; then
   pipx install --force pokerbots-dev
 else

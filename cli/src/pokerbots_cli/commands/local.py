@@ -71,7 +71,7 @@ def test(args):
 def upgrade(args):
     """Upgrade with whichever installer pb came from; --refresh skips uv's stale package index."""
     if shutil.which("uv"):
-        command = ["uv", "tool", "upgrade", "--refresh", "pokerbots-dev"]
+        command = ["uv", "tool", "install", "--refresh", "pokerbots-dev@latest"]
     elif shutil.which("pipx"):
         command = ["pipx", "upgrade", "pokerbots-dev"]
     else:
