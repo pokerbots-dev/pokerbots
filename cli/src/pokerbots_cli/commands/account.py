@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 
 from .. import auth
-from ..api import call
+from ..api import ApiError, call
 from ..fmt import INK, PAPER, colored, held, money, place, signed, spark, table, when
 
 MAX_UPLOAD = 1 << 20
@@ -21,10 +21,28 @@ ATTEST = "I am 18 or older, and paid skill competitions are allowed where I am. 
 
 
 def login(args):
+    if current := auth.load():
+        return print(f"already logged in as {current['user']}; pb logout to switch")
     try:
         print(f"logged in as {auth.login()}")
     except (RuntimeError, OSError) as e:
         sys.exit(f"login failed: {e}")
+
+
+def logout(args):
+    if not auth.load():
+        return print("not logged in")
+    try:
+        call("DELETE", "/session")
+    except ApiError:
+        pass  # the local logout still matters if the server is unreachable
+    auth.credentials_path().unlink()
+    print(f"logged out; your wallet stays at {auth.credentials_path().with_name('wallet.json')}")
+
+
+def whoami(args):
+    current = auth.load()
+    print(f"{current['user']}  github.com/{current['user']}" if current else "not logged in: pb login")
 
 
 def bundle(directory):
@@ -175,6 +193,8 @@ def top(args):
 
 def register(sub):
     sub.add_parser("login", help="sign in with GitHub").set_defaults(run=login)
+    sub.add_parser("logout", help="sign out; keeps your wallet").set_defaults(run=logout)
+    sub.add_parser("whoami", help="who you are logged in as").set_defaults(run=whoami)
     sub.add_parser("watch", help="status, live").set_defaults(run=watch)
     p = sub.add_parser("top", help="leaderboard, live")
     p.add_argument("--live", action="store_true", help="live play instead of paper")

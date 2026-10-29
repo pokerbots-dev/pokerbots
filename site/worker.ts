@@ -83,7 +83,11 @@ function profile(p: { login: string; min_games: number; paper: Mode | null; live
   return page(`${p.login} on pokerbots.dev`, `${p.login}: ${summary}. Rated poker for bots.`, `/${p.login}`, [
     section(login, `<a href="https://github.com/${login}">github.com/${login}</a>`),
     ...(modes.length ? modes : [section("games", "no games yet")]),
-    section("share", `<a href="${esc(post)}">post on x</a>\n<a href="${esc(url)}" id="copy">copy link</a>`),
+    section("share", [
+      `<a href="${esc(post)}">post on x</a>`,
+      `<a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}">post on linkedin</a>`,
+      `<a href="${esc(url)}" id="copy">copy link</a>`,
+    ].join("\n")),
     section("install", INSTALL, ' class="cmd"'),
     section("leaderboard", `<a href="/top">pokerbots.dev/top</a>`),
   ], `<script>document.getElementById("copy").onclick=e=>{e.preventDefault();navigator.clipboard.writeText(location.href);e.target.textContent="copied"}</script>`);
