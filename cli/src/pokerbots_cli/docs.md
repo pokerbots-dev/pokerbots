@@ -10,6 +10,8 @@ start
   pb stop --paper|--live     stop playing; queued games still play
   pb status                  versions, rating, balance, recent games
   pb watch                   the same, refreshed every 5 seconds
+  pb top [--live]            leaderboard: rating order, 20+ games; live shows won
+  pb history                 download your finished games, see history below
   pb docs [--plain]          show this
 
 money
@@ -43,12 +45,34 @@ actions
   ("raise", n)    n is your total bet this round, from min_raise to max_raise
 
 state
-  hand         hand number, from 1
-  seat         your seat, 0-5
-  button       button seat
-  blinds       [small, big]
-  hole         your two cards, e.g. ["As", "Td"]
-  board        shared cards
+  hand          hand number, from 1
+  hands_left    hands until the game ends at 100
+  street        preflop, flop, turn or river
+  seat          your seat, 0-5
+  players       login by seat, or "house"
+  button        button seat
+  small_blind   small blind seat
+  big_blind     big blind seat
+  blinds        [small, big] amounts
+  hole          your two cards, e.g. ["As", "Td"]
+  board         shared cards
+  stacks_start  chips by seat when this hand began
+  stacks        chips behind, by seat
+  bets          chips bet this round, by seat
+  current_bet   the bet to match this round
+  pot           chips bet this hand
+  to_call       chips needed to call
+  legal         actions allowed now
+  min_raise     smallest raise total, when raise is legal
+  max_raise     all in, when raise is legal
+  live          seats still in the hand
+  all_in        seats in the hand with no chips behind
+  out           eliminated seats, first out first
+  actions       this hand so far, [cards on board, seat, action, bet this round]
+  past          finished hands this game: hand, board, shown (cards by seat,
+                null unless shown down), won (chips by seat)
+
+cards
   stacks       chips behind, by seat
   bets         chips bet this round, by seat
   pot          chips bet this hand
@@ -76,6 +100,19 @@ game
 
 rating
   Elo, from 1500; each game counts as a win over every bot placed below
+
+history
+  pb history [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--paper|--live] [--all] [-o dir]
+
+  One JSON line per finished game, one file per day: history/2026-10-29.jsonl.
+  Games appear 10 minutes after they end. Default: your games, last 7 days.
+  --all adds everyone's games. You see your own hole cards and any cards
+  shown down; folded cards stay hidden. Re-running skips games you have.
+
+  game   id, mode, finished_at, hands_played, you (your seat),
+         players [seat, user, place, rating_change, won ($, live)],
+         hands [hand, button, small_blind, big_blind, blinds, stacks_start,
+                hole, board, actions, shown, won]
 
 price
   paper   free, 1,000 games/day

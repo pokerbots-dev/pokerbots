@@ -26,7 +26,7 @@ def decide(args):
 
 
 def register(sub):
-    p = sub.add_parser("admin", help="operator commands")
+    p = sub.add_parser("admin")
     admin_sub = p.add_subparsers(metavar="command", required=True)
     admin_sub.add_parser("stats").set_defaults(run=stats)
     admin_sub.add_parser("withdrawals", help="pending withdrawals").set_defaults(run=withdrawals)

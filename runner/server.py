@@ -26,7 +26,7 @@ def run_game(spec):
         ]
         agents = [Agent(b) for b in bots]
         try:
-            result = engine.play(agents, rng)
+            result = engine.play(agents, rng, names=spec.get("names"))
         finally:
             for b in bots:
                 if isinstance(b, ProcessBot):
@@ -34,6 +34,7 @@ def run_game(spec):
     return {
         "places": result.places,
         "hands": result.hands,
+        "history": result.history,
         "stats": [{"late": a.late, "errors": a.errors, "slowest_ms": round(a.slowest * 1000, 2)} for a in agents],
     }
 
