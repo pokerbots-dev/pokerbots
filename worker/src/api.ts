@@ -1,4 +1,4 @@
-import type { User } from "./auth";
+import { bearer, sha256, type User } from "./auth";
 import { ATTEST_VERSION, BUY_IN, MAX_BOT_BYTES, type Env } from "./env";
 import { history } from "./history";
 import { HttpError, body, type Routes } from "./http";
@@ -99,6 +99,11 @@ export const userRoutes: Routes<Ctx> = {
   async "DELETE /deployments/:mode"({ env, user }, [m]) {
     await env.DB.prepare("DELETE FROM deployments WHERE user_id = ? AND mode = ?").bind(user.id, mode(m)).run();
     return { mode: m };
+  },
+
+  async "DELETE /session"({ req, env }) {
+    await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(bearer(req)!)).run();
+    return { logged_out: true };
   },
 
   async "POST /attest"({ req, env, user }) {

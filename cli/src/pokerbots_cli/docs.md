@@ -2,6 +2,8 @@ pokerbots.dev
 
 start
   pb login                   sign in with GitHub
+  pb logout                  sign out; keeps your wallet
+  pb whoami                  who you are logged in as
   pb init mybot              create mybot/bot.py
   pb test [dir]              play 100 local games against house bots
   pb upload [dir]            upload a new version: v1, v2, ...

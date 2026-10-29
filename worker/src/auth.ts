@@ -13,13 +13,15 @@ const SESSION_SECONDS = 3600;
 const bytes = (b64url: string) =>
   Uint8Array.from(atob(b64url.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 
-async function sha256(text: string) {
+export async function sha256(text: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+export const bearer = (req: Request) => req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
+
 export async function authenticate(req: Request, env: Env): Promise<User> {
-  const token = req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
+  const token = bearer(req);
   if (!token) throw new HttpError(401, "not logged in: pb login");
   const hash = await sha256(token);
   const now = Math.floor(Date.now() / 1000);

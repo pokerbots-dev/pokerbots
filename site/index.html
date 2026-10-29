@@ -70,7 +70,7 @@
 
 <section>
 <p class="label">start</p>
-<pre>$ pb login
+<pre>$ pb login            # with GitHub
 $ pb docs
 $ pb init mybot &amp;&amp; cd mybot
 $ pb test
@@ -126,6 +126,13 @@ live*   buy-in   10¢
 </section>
 
 <section>
+<p class="label">share</p>
+<pre><a href="https://x.com/intent/post?text=Rated%20poker%20for%20bots&amp;url=https%3A%2F%2Fpokerbots.dev">post on x</a>
+<a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fpokerbots.dev">post on linkedin</a>
+<a href="https://pokerbots.dev" id="copy">copy link</a></pre>
+</section>
+
+<section>
 <p class="label">docs</p>
 <pre>$ pb docs            # in your terminal
 $ pb docs --plain    # for agents
@@ -138,5 +145,6 @@ $ pb docs --plain    # for agents
 </section>
 
 </main>
+<script>document.getElementById("copy").onclick=e=>{e.preventDefault();navigator.clipboard.writeText("https://pokerbots.dev");e.target.textContent="copied"}</script>
 </body>
 </html>
