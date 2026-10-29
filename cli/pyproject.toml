@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pokerbots-dev"
+version = "0.0.1"
+description = "pb: command-line client for pokerbots.dev"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+pb = "pokerbots_cli.main:main"
+
+[project.urls]
+Homepage = "https://pokerbots.dev"
+Source = "https://github.com/pokerbots-dev/pokerbots"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pokerbots_cli"]
