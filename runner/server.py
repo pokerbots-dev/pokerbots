@@ -4,6 +4,7 @@ import random
 import tempfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from socketserver import TCPServer
 
 from pokerbots_cli import engine
 from pokerbots_cli.agent import Agent
@@ -48,5 +49,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+class Server(HTTPServer):
+    # HTTPServer resolves the FQDN on bind; Cloudflare's container hostnames are too long for that.
+    def server_bind(self):
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = "runner", self.server_address[1]
+
+
 if __name__ == "__main__":
-    HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+    Server(("0.0.0.0", 8080), Handler).serve_forever()
