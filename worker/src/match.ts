@@ -1,4 +1,3 @@
-import { getRandom } from "@cloudflare/containers";
 import { BUY_IN, GAMES_PER_MINUTE, PAPER_GAMES_PER_DAY, PRIZES, RAKE, RUNNERS, SEATS, type Env } from "./env";
 import { balanceOf, credit, debit } from "./ledger";
 import { elo } from "./rating";
@@ -95,7 +94,7 @@ export async function runGame(env: Env, id: string) {
   const bots = await Promise.all(
     seats.map(async (s) => (s.house ? { house: s.house } : { code: await code(env, s.user_id!, s.version!) })),
   );
-  const runner = await getRandom(env.RUNNER, RUNNERS);
+  const runner = env.RUNNER.get(env.RUNNER.idFromName(`runner-${Math.floor(Math.random() * RUNNERS)}`));
   const res = await runner.fetch("http://runner/run", { method: "POST", body: JSON.stringify({ seed: game.seed, bots }) });
   if (!res.ok) throw new Error(`runner ${res.status}`);
   await record(env, game, seats, await res.json<Outcome>());

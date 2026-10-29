@@ -15,7 +15,6 @@
     "wrangler": "^4.155.0"
   },
   "dependencies": {
-    "@cloudflare/containers": "^0.3.7",
     "@solana-program/token": "^0.18.0",
     "@solana/kit": "^8.6.0"
   }

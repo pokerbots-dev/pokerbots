@@ -28,7 +28,7 @@
       },
       "triggers": { "crons": ["* * * * *"] },
       "durable_objects": { "bindings": [{ "name": "RUNNER", "class_name": "Runner" }] },
-      "containers": [{ "class_name": "Runner", "image": "../runner/Dockerfile", "image_build_context": "..", "max_instances": 10 }],
+      "containers": [{ "class_name": "Runner", "scheduling_policy": "durable_object", "images": { "runner": { "dockerfile": "../runner/Dockerfile", "build_context": ".." } } }],
       "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Runner"] }]
     },
     "production": {
@@ -51,7 +51,7 @@
       },
       "triggers": { "crons": ["* * * * *"] },
       "durable_objects": { "bindings": [{ "name": "RUNNER", "class_name": "Runner" }] },
-      "containers": [{ "class_name": "Runner", "image": "../runner/Dockerfile", "image_build_context": "..", "max_instances": 10 }],
+      "containers": [{ "class_name": "Runner", "scheduling_policy": "durable_object", "images": { "runner": { "dockerfile": "../runner/Dockerfile", "build_context": ".." } } }],
       "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Runner"] }]
     }
   }
