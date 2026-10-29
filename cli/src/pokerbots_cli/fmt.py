@@ -31,7 +31,8 @@ def table(rows, labels=False, header=False):
 
 def money(micro):
     cents = round(micro / 10_000)
-    return f"{cents}¢" if abs(cents) < 100 else f"${cents / 100:,.2f}"
+    sign = "-" if cents < 0 else ""
+    return f"{cents}¢" if abs(cents) < 100 else f"{sign}${abs(cents) / 100:,.2f}"
 
 
 def signed(value, unit=""):

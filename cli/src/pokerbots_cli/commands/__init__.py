@@ -1,3 +1,3 @@
-from . import account, admin, local, money
+from . import account, admin, history, local, money
 
-MODULES = (account, local, money, admin)
+MODULES = (account, history, local, money, admin)

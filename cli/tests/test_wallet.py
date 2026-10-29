@@ -20,5 +20,5 @@ def test_sign_fills_our_slot_only():
 def test_b58_and_money():
     assert wallet.b58(bytes(32)) == "1" * 32
     assert wallet.b58(b"\x00\x01") == "12"
-    assert [money(100_000), money(370_000), money(4_200_000)] == ["10¢", "37¢", "$4.20"]
+    assert [money(100_000), money(370_000), money(4_200_000), money(-1_100_000)] == ["10¢", "37¢", "$4.20", "-$1.10"]
     assert parse_money("$0.10") == 100_000

@@ -56,12 +56,17 @@ def stop(args):
     print(f"stopped {mode}; games already queued will still play")
 
 
+def rank(mode):
+    board = call("GET", f"/leaderboard/{mode}")
+    return f"#{board['you']} of {board['ranked']}" if board["you"] else f"unranked until {board['min_games']} games"
+
+
 def report():
     me = call("GET", "/me")
     rows = [["user", me["login"]], ["versions", " ".join(f"v{v}" for v in me["versions"]) or "-"]]
     for mode in ("paper", "live"):
         d = me["deployments"].get(mode)
-        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}" if d else "-"])
+        rows.append([mode, f"v{d['version']}  rating {d['rating']:.0f}  games {d['games']}  today {d['today']}  {rank(mode)}" if d else "-"])
     rows += [["balance", money(me["balance"])], ["wallet", me["wallet"] or "-"]]
     text = table(rows, labels=True)
     games = call("GET", "/games")
@@ -76,16 +81,26 @@ def report():
     return text
 
 
-def status(args):
-    print(report())
+def leaderboard(mode):
+    board = call("GET", f"/leaderboard/{mode}")
+    live = mode == "live"
+    head = ["rank", "user", "rating", "games"] + (["won"] if live else [])
+    rows = [[i + 1, r["login"], f"{r['rating']:.0f}", r["games"]] + ([signed(r["won"], "money")] if live else [])
+            for i, r in enumerate(board["rows"])]
+    text = f"{mode} leaderboard\n\n" + (table([head] + rows, header=True) if rows else f"no bots with {board['min_games']} games yet")
+    you = f"#{board['you']} of {board['ranked']}" if board["you"] else f"unranked until {board['min_games']} games"
+    return text + "\n\n" + table([["you", you]], labels=True)
 
 
-def watch(args):
+def screen(render):
+    """Full-screen, flicker-free view in the homepage colours, redrawn until ctrl-c."""
+    if not sys.stdout.isatty():
+        return print(render())
     paint = f"\x1b[48;2;{INK}m\x1b[38;2;{PAPER}m" if colored() else ""
     sys.stdout.write("\x1b[?1049h\x1b[?25l" + paint + "\x1b[2J")
     try:
         while True:
-            lines = ["", *("  " + line for line in report().split("\n")), "", "  " + "ctrl-c to quit"]
+            lines = ["", *("  " + line for line in render().split("\n")), "", "  ctrl-c to quit"]
             sys.stdout.write("\x1b[H" + "".join(line + "\x1b[K\n" for line in lines) + "\x1b[J")
             sys.stdout.flush()
             time.sleep(WATCH_SECONDS)
@@ -95,8 +110,24 @@ def watch(args):
         sys.stdout.write("\x1b[0m\x1b[?25h\x1b[?1049l")
 
 
+def status(args):
+    print(report())
+
+
+def watch(args):
+    screen(report)
+
+
+def top(args):
+    screen(lambda: leaderboard("live" if args.live else "paper"))
+
+
 def register(sub):
     sub.add_parser("login", help="sign in with GitHub").set_defaults(run=login)
+    sub.add_parser("watch", help="status, live").set_defaults(run=watch)
+    p = sub.add_parser("top", help="leaderboard, live")
+    p.add_argument("--live", action="store_true", help="live play instead of paper")
+    p.set_defaults(run=top)
 
     p = sub.add_parser("upload", help="upload a new version")
     p.add_argument("dir", nargs="?", default=".")
@@ -112,4 +143,3 @@ def register(sub):
         p.set_defaults(run=run)
 
     sub.add_parser("status", help="your bot, rating, balance and recent games").set_defaults(run=status)
-    sub.add_parser("watch", help="status, live").set_defaults(run=watch)

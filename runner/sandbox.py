@@ -65,12 +65,9 @@ class ProcessBot:
             raise RuntimeError("bot did not start or has exited")
         self.id += 1
         line = (json.dumps({"id": self.id, "state": state}) + "\n").encode()
-        try:
-            if os.write(self.proc.stdin.fileno(), line) < len(line):
-                return self.close()
-        except (BlockingIOError, BrokenPipeError):
-            return self.close()
         deadline = monotonic() + self.limit
+        if not self.write(line, deadline):
+            return self.close()
         while (raw := self.read(deadline)) is not None:
             reply = json.loads(raw)
             if reply.get("id") == self.id:
@@ -85,6 +82,18 @@ class ProcessBot:
             return int(Path(f"/proc/{self.proc.pid}/schedstat").read_text().split()[0]) / 1e9
         except (OSError, ValueError):
             return monotonic()
+
+    def write(self, data, deadline):
+        fd = self.proc.stdin.fileno()
+        while data:
+            left = deadline - monotonic()
+            if left <= 0 or not select.select([], [fd], [], left)[1]:
+                return False
+            try:
+                data = data[os.write(fd, data):]
+            except (BlockingIOError, BrokenPipeError):
+                return False
+        return True
 
     def read(self, deadline):
         fd = self.proc.stdout.fileno()

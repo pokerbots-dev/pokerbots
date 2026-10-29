@@ -1,5 +1,6 @@
 import type { User } from "./auth";
 import { MAX_BOT_BYTES, type Env } from "./env";
+import { history } from "./history";
 import { HttpError, body, type Routes } from "./http";
 import { balance } from "./ledger";
 import { botKey } from "./match";
@@ -14,6 +15,8 @@ interface Ctx {
 
 const ZIP_MAGIC = 0x04034b50;
 const RECENT_GAMES = 10;
+const BOARD_SIZE = 20;
+const BOARD_MIN_GAMES = 20;
 
 function mode(value: unknown) {
   if (value !== "paper" && value !== "live") throw new HttpError(400, "mode is paper or live");
@@ -100,6 +103,28 @@ export const userRoutes: Routes<Ctx> = {
        WHERE s.user_id = ? ORDER BY g.created_at DESC LIMIT ?`,
     ).bind(user.id, RECENT_GAMES).all();
     return results;
+  },
+
+  // Ranked by rating; won is live table results only (buy-ins, payouts, game refunds).
+  async "GET /leaderboard/:mode"({ env, user }, [m]) {
+    const { results } = await env.DB.prepare(
+      `SELECT u.login, r.user_id, ROUND(r.rating) AS rating, r.games,
+         CASE WHEN r.mode = 'live' THEN (SELECT COALESCE(SUM(amount), 0) FROM ledger l WHERE l.user_id = r.user_id
+           AND (l.kind IN ('buyin', 'payout') OR (l.kind = 'refund' AND l.ref NOT LIKE 'w:%'))) END AS won
+       FROM ratings r JOIN users u ON u.id = r.user_id
+       WHERE r.mode = ? AND r.games >= ? ORDER BY r.rating DESC`,
+    ).bind(mode(m), BOARD_MIN_GAMES).all<{ user_id: number }>();
+    const rank = results.findIndex((r) => r.user_id === user.id) + 1;
+    return {
+      min_games: BOARD_MIN_GAMES,
+      ranked: results.length,
+      you: rank || null,
+      rows: results.slice(0, BOARD_SIZE).map(({ user_id, ...row }) => row),
+    };
+  },
+
+  async "GET /history"({ req, env, user }) {
+    return history(req, env, user);
   },
 
   async "POST /deposits"({ req, env, user }) {

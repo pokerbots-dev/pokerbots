@@ -29,6 +29,7 @@ interface Seat {
 interface Outcome {
   places: number[];
   hands: number;
+  history: unknown[];
   stats: { late: number; errors: number }[];
 }
 
@@ -36,6 +37,9 @@ const HOUSE = ["caller", "raiser"];
 const INITIAL_RATING = 1500;
 
 export const botKey = (userId: number, version: number) => `bots/${userId}/v${version}.zip`;
+export const historyKey = (gameId: string) => `games/${gameId}.json.gz`;
+
+const gzip = (text: string) => new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
 
 export async function matchmake(env: Env) {
   for (const mode of ["paper", "live"] as const) {
@@ -90,14 +94,19 @@ export async function failGame(env: Env, id: string) {
 export async function runGame(env: Env, id: string) {
   const game = await env.DB.prepare("SELECT * FROM games WHERE id = ? AND status = 'queued'").bind(id).first<Game>();
   if (!game) return;
-  const { results: seats } = await env.DB.prepare("SELECT * FROM seats WHERE game_id = ? ORDER BY seat").bind(id).all<Seat>();
+  const { results: seats } = await env.DB.prepare(
+    "SELECT s.*, u.login FROM seats s LEFT JOIN users u ON u.id = s.user_id WHERE s.game_id = ? ORDER BY s.seat",
+  ).bind(id).all<Seat & { login: string | null }>();
+  const names = seats.map((s) => s.login ?? "house");
   const bots = await Promise.all(
     seats.map(async (s) => (s.house ? { house: s.house } : { code: await code(env, s.user_id!, s.version!) })),
   );
   const runner = env.RUNNER.get(env.RUNNER.idFromName(`runner-${Math.floor(Math.random() * RUNNERS)}`));
-  const res = await runner.fetch("http://runner/run", { method: "POST", body: JSON.stringify({ seed: game.seed, bots }) });
+  const res = await runner.fetch("http://runner/run", { method: "POST", body: JSON.stringify({ seed: game.seed, bots, names }) });
   if (!res.ok) throw new Error(`runner ${res.status}`);
-  await record(env, game, seats, await res.json<Outcome>());
+  const outcome = await res.json<Outcome>();
+  await env.BOTS.put(historyKey(id), await gzip(JSON.stringify({ names, hands: outcome.history })));
+  await record(env, game, seats, outcome);
 }
 
 async function code(env: Env, userId: number, version: number) {
@@ -136,6 +145,6 @@ async function record(env: Env, game: Game, seats: Seat[], outcome: Outcome) {
     return out;
   });
   if (game.mode === "live") statements.push(credit(env, null, "rake", RAKE, game.id));
-  statements.push(env.DB.prepare("UPDATE games SET status = 'done', hands = ? WHERE id = ? AND status = 'queued'").bind(outcome.hands, game.id));
+  statements.push(env.DB.prepare("UPDATE games SET status = 'done', hands = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'queued'").bind(outcome.hands, game.id));
   await env.DB.batch(statements);
 }
